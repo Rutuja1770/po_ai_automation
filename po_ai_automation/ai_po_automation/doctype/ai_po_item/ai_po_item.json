@@ -10,6 +10,7 @@
   "item_code",
   "customer_item_code",
   "rate",
+  "our_selling_price",
   "match_confidence",
   "column_break_vxpn",
   "qty",
@@ -20,7 +21,7 @@
  "fields": [
   {
    "fieldname": "po_item_description",
-   "fieldtype": "Data",
+   "fieldtype": "Long Text",
    "label": "PO Item Description"
   },
   {
@@ -38,6 +39,14 @@
    "fieldname": "rate",
    "fieldtype": "Currency",
    "label": "Rate"
+  },
+  {
+   "fieldname": "our_selling_price",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Our Selling Price",
+   "options": "currency",
+   "read_only": 1
   },
   {
    "fieldname": "match_confidence",

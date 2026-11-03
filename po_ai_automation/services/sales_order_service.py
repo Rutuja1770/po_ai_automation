@@ -1,4 +1,5 @@
 import frappe
+from frappe.contacts.doctype.address.address import get_default_address
 
 
 def create_sales_order(po_data, validation_result):
@@ -23,13 +24,19 @@ def create_sales_order(po_data, validation_result):
 
     if company:
         sales_order.company = company
+        if not sales_order.get("company_address"):
+            sales_order.company_address = get_default_address(
+                "Company",
+                company,
+            )
 
     # Customer PO information
     if po_data.get("po_number"):
         sales_order.po_no = po_data.get("po_number")
 
-    if po_data.get("po_date"):
-        sales_order.po_date = po_data.get("po_date")
+    po_date = po_data.get("po_date")
+    if po_date:
+        sales_order.po_date = po_date
 
     # Currency
     if po_data.get("currency"):
@@ -38,8 +45,15 @@ def create_sales_order(po_data, validation_result):
     # Delivery Date
     # --------------------------------
 
-    if po_data.get("delivery_date"):
-        sales_order.delivery_date = po_data.get("delivery_date")
+    delivery_date = po_data.get("delivery_date") or frappe.utils.nowdate()
+    sales_order.delivery_date = delivery_date
+
+    if (
+        po_date
+        and frappe.utils.getdate(delivery_date)
+        < frappe.utils.getdate(frappe.utils.nowdate())
+    ):
+        sales_order.transaction_date = po_date
 
     # --------------------------------
     # Taxes and Charges

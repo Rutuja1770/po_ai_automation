@@ -7,9 +7,9 @@ import frappe
 from google import genai
 
 
-def extract_po_data_from_scanned_pdf(pdf_path):
+def extract_po_data_from_visual_file(file_path, mime_type=None):
     """
-    Extract structured Purchase Order data from a scanned PDF
+    Extract structured Purchase Order data from a scanned PDF or image
     using Gemini Vision.
     """
 
@@ -33,18 +33,6 @@ def extract_po_data_from_scanned_pdf(pdf_path):
     )
 
     # --------------------------------------------------
-    # Step 3: Open scanned PDF
-    # --------------------------------------------------
-
-    try:
-        pdf = fitz.open(pdf_path)
-
-    except Exception as e:
-        raise Exception(
-            f"Unable to open PDF file: {str(e)}"
-        )
-
-    # --------------------------------------------------
     # Step 4: Prepare Gemini prompt
     # --------------------------------------------------
 
@@ -60,7 +48,9 @@ headers, addresses, tables and terminology.
 Extract the following information:
 
 - customer_name
+- customer_gstin
 - supplier_name
+- supplier_gstin
 - po_number
 - po_date
 - delivery_date
@@ -71,10 +61,23 @@ Extract the following information:
 For every item extract:
 
 - description
+- item_code
 - qty
 - uom
 - rate
 - amount
+
+item_code is the customer's own part/reference code for the
+item as written on the PO (e.g. Part No, Customer Code,
+Ref Code, SKU, Article No). It is NOT our internal item
+code. The code may be in a separate table column OR explicitly
+included in the item description, for example
+"Make - Renu, Model - FL001A-0800LV3". In that case extract
+the value after labels such as Model, Model No, Part No,
+Item Code, Customer Code, SKU, or Ref Code as item_code.
+Do not return the maker name or ordinary descriptive text
+as item_code. Return null only when no explicit item/reference
+code is present anywhere for that line.
 
 
 IMPORTANT CUSTOMER / SUPPLIER RULES:
@@ -116,6 +119,11 @@ IMPORTANT CUSTOMER / SUPPLIER RULES:
 
 9. If the customer or supplier cannot be determined
    reliably, return null.
+
+10. Extract the customer's GSTIN separately as customer_gstin
+    and the supplier's GSTIN separately as supplier_gstin.
+    Use document context to associate each number with the
+    correct party. Return null if a party's GSTIN is not shown.
 
 
 IMPORTANT DATE RULES:
@@ -172,7 +180,9 @@ Return exactly this JSON structure:
 
 {
     "customer_name": null,
+    "customer_gstin": null,
     "supplier_name": null,
+    "supplier_gstin": null,
     "po_number": null,
     "po_date": null,
     "delivery_date": null,
@@ -180,6 +190,7 @@ Return exactly this JSON structure:
     "items": [
         {
             "description": null,
+            "item_code": null,
             "qty": null,
             "uom": null,
             "rate": null,
@@ -196,40 +207,53 @@ Return exactly this JSON structure:
 
     contents = [prompt]
 
-    try:
-
-        for page_number, page in enumerate(pdf):
-
-            # Render PDF page at 2x resolution
-            pix = page.get_pixmap(
-                matrix=fitz.Matrix(2, 2),
-                alpha=False
+    if mime_type and mime_type.startswith("image/"):
+        if mime_type not in {
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/heic",
+            "image/heif",
+        }:
+            raise ValueError(
+                f"Unsupported image type: {mime_type}. "
+                "Use JPEG, PNG, WebP, HEIC, or HEIF."
             )
 
-            image_bytes = pix.tobytes(
-                "png"
-            )
-
+        with open(file_path, "rb") as image_file:
             contents.append(
                 {
                     "inline_data": {
-                        "mime_type": "image/png",
-                        "data": image_bytes,
+                        "mime_type": mime_type,
+                        "data": image_file.read(),
                     }
                 }
             )
+    else:
+        try:
+            pdf = fitz.open(file_path)
+        except Exception as e:
+            raise ValueError(f"Unable to open the uploaded PDF: {e}") from e
 
-    except Exception as e:
+        try:
+            for page in pdf:
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(2, 2),
+                    alpha=False
+                )
 
-        pdf.close()
-
-        raise Exception(
-            f"Failed to convert PDF pages to images: {str(e)}"
-        )
-
-    finally:
-
-        pdf.close()
+                contents.append(
+                    {
+                        "inline_data": {
+                            "mime_type": "image/png",
+                            "data": pix.tobytes("png"),
+                        }
+                    }
+                )
+        except Exception as e:
+            raise ValueError(f"Failed to convert PDF pages to images: {e}") from e
+        finally:
+            pdf.close()
 
     # --------------------------------------------------
     # Step 6: Send images to Gemini Vision
@@ -388,6 +412,15 @@ Return exactly this JSON structure:
     # --------------------------------------------------
 
     return po_data
+
+
+def extract_po_data_from_scanned_pdf(pdf_path):
+    """Keep the original scanned-PDF entry point available."""
+
+    return extract_po_data_from_visual_file(
+        pdf_path,
+        mime_type="application/pdf",
+    )
 # import json
 # import os
 

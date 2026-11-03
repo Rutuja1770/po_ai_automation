@@ -1,5 +1,9 @@
 import frappe
 
+from po_ai_automation.services.gstin_service import (
+    find_master_by_gstin,
+)
+
 
 def find_matching_company(supplier_name):
     """
@@ -56,3 +60,9 @@ def find_matching_company(supplier_name):
         }
 
     return None
+
+
+def find_company_by_gstin(gstin):
+    """Find an ERPNext Company by an exact GSTIN when uniquely matched."""
+
+    return find_master_by_gstin("Company", gstin)

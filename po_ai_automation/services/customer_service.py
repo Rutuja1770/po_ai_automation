@@ -1,5 +1,9 @@
 import frappe
 
+from po_ai_automation.services.gstin_service import (
+    find_master_by_gstin,
+)
+
 
 def find_customer(customer_name):
     """
@@ -13,6 +17,12 @@ def find_customer(customer_name):
         return match["name"]
 
     return None
+
+
+def find_customer_by_gstin(gstin):
+    """Find an ERPNext Customer by an exact GSTIN when uniquely matched."""
+
+    return find_master_by_gstin("Customer", gstin)
 
 
 def find_customer_with_confidence(customer_name):

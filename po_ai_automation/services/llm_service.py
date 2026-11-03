@@ -73,6 +73,9 @@ Do NOT assume that the first company name is the customer.
 Determine which company is acting as the BUYER in the Purchase
 Order.
 
+If a GSTIN is printed for the buyer/customer, extract it as
+customer_gstin. Keep it separate from supplier_gstin.
+
 ==================================================
 SUPPLIER IDENTIFICATION
 ==================================================
@@ -95,6 +98,9 @@ Use the overall document context.
 
 IMPORTANT:
 Do not confuse the supplier with the customer.
+
+If a GSTIN is printed for the supplier/vendor, extract it as
+supplier_gstin. Keep it separate from customer_gstin.
 
 ==================================================
 PURCHASE ORDER NUMBER
@@ -225,16 +231,43 @@ Possible amount columns:
 - Line Total
 - Total
 
+Possible customer item code / reference columns:
+
+- Item Code
+- Customer Part No
+- Part No
+- Part Number
+- Customer Code
+- Ref Code
+- Reference
+- SKU
+- Article No
+- Material No
+- Catalogue No
+- Product Code
+
 Use the table structure to correctly associate each value
 with the corresponding item.
 
 For EVERY line item extract:
 
 - description
+- item_code
 - qty
 - uom
 - rate
 - amount
+
+item_code is the customer's own part/reference code for the
+item as written on the PO. It is NOT our internal item code.
+The code may be in a separate table column OR explicitly
+included in the item description, for example
+"Make - Renu, Model - FL001A-0800LV3". In that case extract
+the value after labels such as Model, Model No, Part No,
+Item Code, Customer Code, SKU, or Ref Code as item_code.
+Do not return the maker name or ordinary descriptive text
+as item_code. Return null only when no explicit item/reference
+code is present anywhere for that line.
 
 Return ALL line items.
 
@@ -292,7 +325,9 @@ REQUIRED JSON FORMAT
 
 {{
     "customer_name": null,
+    "customer_gstin": null,
     "supplier_name": null,
+    "supplier_gstin": null,
     "po_number": null,
     "po_date": null,
     "delivery_date": null,
@@ -300,6 +335,7 @@ REQUIRED JSON FORMAT
     "items": [
         {{
             "description": null,
+            "item_code": null,
             "qty": null,
             "uom": null,
             "rate": null,

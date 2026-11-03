@@ -189,6 +189,8 @@
 #         )
 
 
+import mimetypes
+
 import frappe
 
 from po_ai_automation.services.pdf_service import (
@@ -200,11 +202,19 @@ from po_ai_automation.services.llm_service import (
 )
 
 from po_ai_automation.services.vision_service import (
-    extract_po_data_from_scanned_pdf
+    extract_po_data_from_visual_file
+)
+
+from po_ai_automation.services.extraction_utils import (
+    populate_item_codes_from_descriptions
 )
 
 from po_ai_automation.services.validation_service import (
     validate_po_data
+)
+
+from po_ai_automation.services.item_service import (
+    get_standard_selling_price
 )
 
 from po_ai_automation.services.sales_order_service import (
@@ -259,38 +269,33 @@ def process_po(docname):
         file_path = file_doc.get_full_path()
 
         # ==================================================
-        # STEP 3: DETECT PDF TYPE
+        # STEP 3: DETECT FILE TYPE AND EXTRACT PO DATA
         # ==================================================
 
-        pdf_result = extract_text_from_pdf(
-            file_path
-        )
+        file_name = file_doc.file_name or doc.po_attachment
+        mime_type = mimetypes.guess_type(file_name)[0]
 
-        # ==================================================
-        # STEP 4: AI EXTRACTION
-        # ==================================================
-
-        if not pdf_result["is_text_pdf"]:
-
-            # ----------------------------------------------
-            # SCANNED PDF
-            # ----------------------------------------------
-
-            po_data = extract_po_data_from_scanned_pdf(
-                file_path
+        if mime_type and mime_type.startswith("image/"):
+            po_data = extract_po_data_from_visual_file(
+                file_path,
+                mime_type=mime_type,
             )
-
         else:
+            pdf_result = extract_text_from_pdf(file_path)
 
-            # ----------------------------------------------
-            # DIGITAL PDF
-            # ----------------------------------------------
+            if not pdf_result["is_text_pdf"]:
+                po_data = extract_po_data_from_visual_file(
+                    file_path,
+                    mime_type="application/pdf",
+                )
+            else:
+                po_data = extract_po_data(
+                    pdf_result["text"]
+                )
 
-            extracted_text = pdf_result["text"]
-
-            po_data = extract_po_data(
-                extracted_text
-            )
+        po_data = populate_item_codes_from_descriptions(
+            po_data
+        )
 
         # ==================================================
         # STEP 5: SAVE AI RESPONSE
@@ -383,9 +388,17 @@ def process_po(docname):
                         item.get("description")
                     ),
                     "item_code": item.get("erpnext_item"),
+                    "customer_item_code": item.get(
+                        "item_code"
+                    ),
                     "qty": item.get("qty"),
                     "uom": uom,
                     "rate": item.get("rate"),
+                    "our_selling_price": get_standard_selling_price(
+                        item.get("erpnext_item"),
+                        currency=po_doc.currency,
+                        uom=uom,
+                    ),
                     "amount": item.get("amount"),
                     "match_confidence": item.get(
                         "match_confidence"
@@ -509,8 +522,7 @@ def process_po(docname):
                     "status": "Failed",
                     "validation_status": "Failed",
                     "error_message": (
-                        "PO processing failed. "
-                        "Please check Error Log."
+                        f"PO processing failed: {e}"
                     )
                 },
                 update_modified=False
@@ -519,15 +531,17 @@ def process_po(docname):
             frappe.db.commit()
 
         except Exception:
-            pass
+            frappe.log_error(
+                frappe.get_traceback(),
+                "AI PO Processing Failure Status Update Error"
+            )
 
         # --------------------------------------------------
         # SHOW ERROR
         # --------------------------------------------------
 
         frappe.throw(
-            "PO processing failed. "
-            "Please check Error Log."
+            f"PO processing failed: {e}"
         )
 # import frappe
 
@@ -658,4 +672,3 @@ def process_po(docname):
 #             "PO processing failed. "
 #             "Please check Error Log."
 #         )
-

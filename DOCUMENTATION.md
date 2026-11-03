@@ -111,10 +111,11 @@ po_ai_automation/
 
 | Field | Type | Description |
 |---|---|---|
-| `po_item_description` | Data | Line item description from PO |
+| `po_item_description` | Long Text | Full line item description from PO; no 140-character Data field limit. Existing sites must run `bench migrate` to update the DocType and database column. |
 | `item_code` | Link → Item | Matched ERPNext item |
 | `customer_item_code` | Data | Customer's item code |
-| `rate` | Currency | Unit rate |
+| `rate` | Currency | Unit rate extracted from the customer PO |
+| `our_selling_price` | Currency | Generic selling price from the selling Price List configured in Selling Settings; blank if no single current price matches the PO currency and UOM |
 | `match_confidence` | Percent | Item match confidence |
 | `qty` | Float | Quantity |
 | `uom` | Link → UOM | Unit of measure |
@@ -153,7 +154,7 @@ po_ai_automation/
 
 ### 5.2 `llm_service.py` (Digital POs)
 - `extract_po_data(text)` — sends text + large extraction prompt to **Gemini** (`gemini-3.6-flash` via `google-genai` SDK).
-- Prompt extracts: `customer_name`, `supplier_name`, `po_number`, `po_date`, `delivery_date`, `currency`, `items[]` (description, qty, uom, rate, amount), `grand_total`; dates normalized to `YYYY-MM-DD`; nulls for unknowns; JSON-only output.
+- Prompt extracts: `customer_name`, `customer_gstin`, `supplier_name`, `supplier_gstin`, `po_number`, `po_date`, `delivery_date`, `currency`, `items[]` (description, customer `item_code`, qty, uom, rate, amount), `grand_total`; dates normalized to `YYYY-MM-DD`; nulls for unknowns; JSON-only output.
 - 3 retry attempts with exponential backoff (`2 ** attempt` seconds).
 - Strips Markdown ```json fences before `json.loads`.
 
@@ -165,17 +166,27 @@ po_ai_automation/
 
 ### 5.4 `customer_service.py`
 - `find_customer(name)` — matching cascade: exact `customer_name` → case-insensitive `LIKE %name%` (limit 10) → **returns match only if exactly one** result (never guesses ambiguities).
+- Customer validation falls back to a unique exact GSTIN/tax ID match only when the name lookup has no match.
+
+### 5.4a `company_service.py`
+- Supplier/company matching falls back to a unique exact GSTIN/tax ID match only when the name lookup has no match.
+
+### 5.4b `gstin_service.py`
+- `find_master_by_gstin(doctype, gstin)` — checks available `gstin` and `tax_id` fields on Customer/Company, normalizes the extracted value, and returns a match only when exactly one master record matches.
 
 ### 5.5 `item_service.py`
-- `find_item(description)` — exact `item_name` → exact `item_code` → `LIKE %description%` (limit 10) → single-match only.
+- `find_item(description)` — legacy/general helper: exact `item_name` → exact `item_code` → `LIKE %description%` (limit 10) → single-match only. PO validation does not call this helper.
+- `find_item_by_code(item_code)` — exact ERPNext item-code match; used first for PO item validation.
+- `find_item_by_customer_ref(item_code, customer)` — exact `Item Customer Detail.customer_name` + `ref_code` lookup; used only when the ERPNext item-code match fails.
+- `get_standard_selling_price(item_code, currency, uom)` — reads the generic, current Item Price in the enabled selling Price List configured in Selling Settings (`selling_price_list`) without changing the customer PO rate; returns no value when the setting or price is missing or ambiguous.
 
 ### 5.6 `validation_service.py`
-- `validate_po_data(po_data)` — verifies presence and validity of customer, **supplier (our company)**, PO number, date, currency, items; matches customer/items against ERPNext masters; returns `{is_valid, errors, validated_items, matched_customer, company, confidence}`.
+- `validate_po_data(po_data)` — verifies presence and validity of customer, **supplier (our company)**, PO number, date, currency, items; validates items by exact ERPNext item code, then by the resolved customer and customer reference code. Item description is retained for display and is not used to match or validate an item.
 - **Supplier = our company check:** the supplier named on a customer PO is the party the PO is addressed to, so it must match one of our ERPNext **Companies** (`services/company_service.find_matching_company`: exact `company_name` = 100, exact docname = 95, unique partial = 80). If the PO's supplier matches no Company, validation fails with *"This PO does not appear to be for our company"* — preventing POs meant for other vendors from becoming Sales Orders. A missing supplier is also an error.
-- **`ai_confidence` score (0–100):** extracted header fields (70: customer 15, supplier 10, po_number 10, po_date 10, delivery_date 5, currency 10, grand_total 10) + customer master match (15) + company match (5) + average item match (20).
+- **`ai_confidence` score (0–100):** extracted header fields (70: customer 15, supplier 10, po_number 10, po_date 10, delivery_date 5, currency 10, grand_total 10) + customer master match (15) + company match (5) + average item-code/customer-reference match (20).
 
 ### 5.7 `sales_order_service.py`
-- `create_sales_order(po_data, validation_result)` — throws if validation failed; creates a **draft** Sales Order with `company` (from the PO supplier match), `customer`, `po_no`, `po_date`, `currency`, `delivery_date` and one row per validated item (`item_code`, `qty`, `rate`, `warehouse`); `insert(ignore_permissions=True)`; returns SO name.
+- `create_sales_order(po_data, validation_result)` — throws if validation failed; creates a **draft** Sales Order with `company` (from the PO supplier match), `customer`, `po_no`, `po_date`, `currency`, `delivery_date` and one row per validated item (`item_code`, `qty`, `rate`, `warehouse`); if delivery date is before today, sets `transaction_date` to the PO date, otherwise preserves ERPNext's default; `insert(ignore_permissions=True)`; returns SO name.
 - **Automatic taxes and charges:** ERPNext only fetches a tax template in the UI when a customer is selected — a server-side SO insert never runs that logic, so `get_taxes_and_charges_template()` resolves it and appends the template's tax rows before insert. Priority: (1) `po_sales_taxes_charges_template` in `site_config.json`, (2) standard ERPNext **Tax Rule** match (`party.set_taxes` for customer/company/date), (3) the company's default template (`is_default = 1`). Tax totals are then computed by ERPNext's normal validate flow.
 - **Automatic warehouse:** ERPNext throws *"Source warehouse required for stock item"* if a stock item row has no warehouse, so `get_source_warehouse()` fills it automatically. Priority: (1) `po_source_warehouse` in `site_config.json`, (2) Item Default `default_warehouse` for the company, (3) any active non-group Company warehouse (preferring one named like "Stores"). If still none for a stock item, a clear error tells you which config to set.
 

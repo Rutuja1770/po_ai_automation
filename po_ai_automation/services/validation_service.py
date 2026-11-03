@@ -1,11 +1,14 @@
 from po_ai_automation.services.company_service import (
+    find_company_by_gstin,
     find_matching_company
 )
 from po_ai_automation.services.customer_service import (
+    find_customer_by_gstin,
     find_customer_with_confidence
 )
 from po_ai_automation.services.item_service import (
-    find_item_with_confidence
+    find_item_by_code,
+    find_item_by_customer_ref
 )
 
 
@@ -20,6 +23,11 @@ def validate_po_data(po_data):
     customer_name = po_data.get("customer_name")
 
     customer_match = find_customer_with_confidence(customer_name)
+
+    if not customer_match:
+        customer_match = find_customer_by_gstin(
+            po_data.get("customer_gstin")
+        )
 
     customer = customer_match["name"] if customer_match else None
 
@@ -40,11 +48,17 @@ def validate_po_data(po_data):
 
     company_match = find_matching_company(supplier_name)
 
-    if not supplier_name:
-        errors.append(
-            "Supplier / our company could not be "
-            "determined from the PO."
+    if not company_match:
+        company_match = find_company_by_gstin(
+            po_data.get("supplier_gstin")
         )
+
+    if not supplier_name:
+        if not company_match:
+            errors.append(
+                "Supplier / our company could not be "
+                "determined from the PO."
+            )
 
     elif not company_match:
         errors.append(
@@ -96,12 +110,20 @@ def validate_po_data(po_data):
     for index, item in enumerate(items, start=1):
 
         description = item.get("description")
+        item_code = item.get("item_code")
 
-        item_match = find_item_with_confidence(description)
+        item_match = find_item_by_code(item_code)
+
+        if not item_match:
+            item_match = find_item_by_customer_ref(
+                item_code,
+                customer
+            )
 
         if not item_match:
             errors.append(
-                f"Item {index} not found: {description}"
+                f"Item {index} not found for item code: "
+                f"{item_code or 'not provided'}"
             )
 
         validated_items.append({
@@ -109,6 +131,7 @@ def validate_po_data(po_data):
                 item_match["name"] if item_match else None
             ),
             "description": description,
+            "item_code": item_code,
             "qty": item.get("qty"),
             "uom": item.get("uom"),
             "rate": item.get("rate"),
