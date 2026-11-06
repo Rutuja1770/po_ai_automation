@@ -9,10 +9,6 @@ class AIPOProcessing(Document):
 	def validate(self):
 		if not self.delivery_date:
 			self.delivery_date = frappe.utils.nowdate()
-			frappe.msgprint(
-				"We have set a default delivery date (today). "
-				"Please change it according to your requirement."
-			)
 
 		if (
 			self.po_date

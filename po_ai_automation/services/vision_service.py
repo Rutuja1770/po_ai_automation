@@ -67,17 +67,26 @@ For every item extract:
 - rate
 - amount
 
-item_code is the customer's own part/reference code for the
-item as written on the PO (e.g. Part No, Customer Code,
-Ref Code, SKU, Article No). It is NOT our internal item
-code. The code may be in a separate table column OR explicitly
-included in the item description, for example
-"Make - Renu, Model - FL001A-0800LV3". In that case extract
-the value after labels such as Model, Model No, Part No,
-Item Code, Customer Code, SKU, or Ref Code as item_code.
-Do not return the maker name or ordinary descriptive text
-as item_code. Return null only when no explicit item/reference
-code is present anywhere for that line.
+item_code is the item identifier printed on the PO for that
+line. It may be our ERPNext item code OR the customer's own
+part/reference code. Extract the exact value as printed; do
+not assume who assigned it. Read code columns (such as Item
+Code, Code, Part No, Product Code, Customer Code, Ref Code,
+SKU, Material No, or Article No) and associate each value
+with the correct table row. It may also appear after an
+explicit label in the description, for example
+"Make - Renu, Model - FL001A-0800LV3". Do not return the
+maker name or ordinary descriptive text as item_code. Preserve
+letters, digits, hyphens, slashes, and leading zeros. Return
+null only when that line has no printed item identifier.
+
+Some POs put the item identifier in a column named
+"Name of Product / Service" or similar without labeling it as
+a code. If a row's product value is a compact code-like string
+(for example "FP4070TN - E" or "FPEM-0808RP-A0401U-V2"),
+extract that value as item_code as well as description. Do not
+require an "Item Code" heading. Do not treat a full prose
+description as a code just because it contains letters/numbers.
 
 
 IMPORTANT CUSTOMER / SUPPLIER RULES:
@@ -112,6 +121,7 @@ IMPORTANT CUSTOMER / SUPPLIER RULES:
    - Footer
    - Contact information
    - Tax information
+   - The item-table headers and row values; a compact code-like value in the product/service column is also an item identifier, even without an item-code heading
 
 7. Do not confuse the supplier with the customer.
 
@@ -124,6 +134,18 @@ IMPORTANT CUSTOMER / SUPPLIER RULES:
     and the supplier's GSTIN separately as supplier_gstin.
     Use document context to associate each number with the
     correct party. Return null if a party's GSTIN is not shown.
+11. Use the visible Purchase Order logo/letterhead as an
+    additional clue for identifying the buyer/customer. A
+    Purchase Order is normally issued by its buyer, so when a
+    company logo identifies the PO issuer, assign that company
+    to customer_name/customer_gstin. Identify the other party
+    from its vendor/supplier details and assign it to
+    supplier_name/supplier_gstin. Do not decide based only on
+    which company block appears first or is more prominent.
+    Cross-check the logo, PO title, addresses, labels, and
+    GSTINs together; if they conflict and cannot be resolved,
+    return null for the uncertain party rather than swapping
+    the roles.
 
 
 IMPORTANT DATE RULES:

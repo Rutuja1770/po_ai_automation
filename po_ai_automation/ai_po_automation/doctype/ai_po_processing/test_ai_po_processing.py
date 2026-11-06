@@ -9,12 +9,17 @@ from po_ai_automation.services.extraction_utils import (
 	populate_item_codes_from_descriptions,
 )
 from po_ai_automation.services.item_service import (
+	get_item_master_description,
 	get_standard_selling_price,
 )
 from po_ai_automation.services.sales_order_service import (
 	create_sales_order,
+	get_taxes_and_charges_rows,
 )
-from po_ai_automation.services.validation_service import validate_po_data
+from po_ai_automation.services.validation_service import (
+	correct_reversed_party_roles,
+	validate_po_data,
+)
 
 
 # On IntegrationTestCase, the doctype test records and all
@@ -65,6 +70,76 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 		self.assertEqual(
 			result["items"][0]["item_code"],
 			"FL001A-0800LV3",
+		)
+
+	def test_extracts_generic_labeled_code_from_description(self):
+		po_data = {
+			"items": [
+				{
+					"description": "Code: FP2070TN",
+					"item_code": None,
+				}
+			]
+		}
+
+		result = populate_item_codes_from_descriptions(po_data)
+
+		self.assertEqual(
+			result["items"][0]["item_code"],
+			"FP2070TN",
+		)
+
+	def test_extracts_standalone_code_from_product_description(self):
+		po_data = {
+			"items": [
+				{
+					"description": "FP4070TN - E",
+					"item_code": None,
+				},
+				{
+					"description": "FPEM-0808RP-A0401U-V2",
+					"item_code": None,
+				},
+			]
+		}
+
+		result = populate_item_codes_from_descriptions(po_data)
+
+		self.assertEqual(
+			[item["item_code"] for item in result["items"]],
+			["FP4070TN-E", "FPEM-0808RP-A0401U-V2"],
+		)
+
+	def test_does_not_infer_code_from_prose_description(self):
+		po_data = {
+			"items": [
+				{
+					"description": "FP4070TN is a module with 8 channels",
+					"item_code": None,
+				}
+			]
+		}
+
+		result = populate_item_codes_from_descriptions(po_data)
+
+		self.assertIsNone(result["items"][0]["item_code"])
+
+	def test_uses_explicit_item_code_alias(self):
+		po_data = {
+			"items": [
+				{
+					"description": "Unrelated item description",
+					"item_code": None,
+					"product_code": "ERP-ITEM-1",
+				}
+			]
+		}
+
+		result = populate_item_codes_from_descriptions(po_data)
+
+		self.assertEqual(
+			result["items"][0]["item_code"],
+			"ERP-ITEM-1",
 		)
 
 	def test_does_not_infer_code_from_unlabeled_description(self):
@@ -131,11 +206,27 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 		)
 
 	@patch(
-		"po_ai_automation.services.validation_service.find_matching_company",
-		return_value=None,
+		"po_ai_automation.services.item_service.frappe.db.get_value",
+		return_value="ERP item master description",
 	)
+	def test_gets_description_from_matched_item_master(
+		self,
+		get_value,
+	):
+		description = get_item_master_description("ITEM-1")
+
+		self.assertEqual(
+			description,
+			"ERP item master description",
+		)
+		get_value.assert_called_once_with(
+			"Item",
+			"ITEM-1",
+			"description",
+		)
+
 	@patch(
-		"po_ai_automation.services.validation_service.find_company_by_gstin",
+		"po_ai_automation.services.validation_service.find_company_for_po",
 		return_value={
 			"name": "Matched Company",
 			"match_confidence": 100.0,
@@ -143,11 +234,7 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 		},
 	)
 	@patch(
-		"po_ai_automation.services.validation_service.find_customer_with_confidence",
-		return_value=None,
-	)
-	@patch(
-		"po_ai_automation.services.validation_service.find_customer_by_gstin",
+		"po_ai_automation.services.validation_service.find_customer_for_po",
 		return_value={
 			"name": "Matched Customer",
 			"match_confidence": 100.0,
@@ -169,10 +256,8 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 		self,
 		_find_item_by_code,
 		_find_item_by_customer_ref,
-		find_customer_by_gstin,
-		_find_customer_by_name,
-		find_company_by_gstin,
-		_find_company_by_name,
+		_find_customer_for_po,
+		_find_company_for_po,
 	):
 		po_data = self.get_po_data("ERP-ITEM-1")
 		po_data.update({
@@ -186,9 +271,242 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 
 		self.assertTrue(result["valid"])
 		self.assertEqual(result["customer"], "Matched Customer")
-		self.assertEqual(result["company"], "Matched Company")
-		find_customer_by_gstin.assert_called_once_with("27ABCDE1234F1Z5")
-		find_company_by_gstin.assert_called_once_with("29ABCDE1234F1Z8")
+
+	def test_customer_name_is_used_when_gstin_does_not_match(self):
+		from po_ai_automation.services import customer_service
+
+		with patch.object(
+			customer_service,
+			"find_customer_by_gstin",
+			return_value=None,
+		) as find_by_gstin, patch.object(
+			customer_service,
+			"find_customer_with_confidence",
+			return_value={"name": "Name Match"},
+		) as find_by_name:
+			result = customer_service.find_customer_for_po(
+				"Ryali Technologies",
+				"UNMATCHED-GSTIN",
+			)
+
+		self.assertEqual(result["name"], "Name Match")
+		find_by_gstin.assert_called_once_with("UNMATCHED-GSTIN")
+		find_by_name.assert_called_once_with("Ryali Technologies")
+
+	def test_customer_name_is_used_when_gstin_is_missing(self):
+		from po_ai_automation.services import customer_service
+
+		with patch.object(
+			customer_service,
+			"find_customer_with_confidence",
+			return_value={"name": "Name Match"},
+		) as find_by_name:
+			result = customer_service.find_customer_for_po(
+				"Customer Name",
+				None,
+			)
+
+		self.assertEqual(result["name"], "Name Match")
+		find_by_name.assert_called_once_with("Customer Name")
+
+	def test_company_name_is_used_when_gstin_does_not_match(self):
+		from po_ai_automation.services import company_service
+
+		with patch.object(
+			company_service,
+			"find_company_by_gstin",
+			return_value=None,
+		) as find_by_gstin, patch.object(
+			company_service,
+			"find_matching_company",
+			return_value={"name": "Name Match"},
+		) as find_by_name:
+			result = company_service.find_company_for_po(
+				"Supplier Name",
+				"UNMATCHED-GSTIN",
+			)
+
+		self.assertEqual(result["name"], "Name Match")
+		find_by_gstin.assert_called_once_with("UNMATCHED-GSTIN")
+		find_by_name.assert_called_once_with("Supplier Name")
+
+	def test_company_name_is_used_when_gstin_is_missing(self):
+		from po_ai_automation.services import company_service
+
+		with patch.object(
+			company_service,
+			"find_matching_company",
+			return_value={"name": "Name Match"},
+		) as find_by_name:
+			result = company_service.find_company_for_po(
+				"Supplier Name",
+				None,
+			)
+
+		self.assertEqual(result["name"], "Name Match")
+		find_by_name.assert_called_once_with("Supplier Name")
+
+	def test_company_name_match_ignores_pvt_ltd_punctuation(self):
+		from po_ai_automation.services import company_service
+
+		with patch.object(
+			company_service.frappe.db,
+			"get_value",
+			return_value=None,
+		), patch.object(
+			company_service.frappe.db,
+			"exists",
+			return_value=None,
+		), patch.object(
+			company_service.frappe,
+			"get_all",
+			side_effect=[
+				[],
+				[
+					SimpleNamespace(
+						name="RENU FACTORY AUTOMATION PRIVATE LIMITED",
+						company_name=(
+							"Renu Factory Automation Private Limited"
+						),
+					)
+				],
+			],
+		) as get_all:
+			result = company_service.find_matching_company(
+				"RENU FACTORY AUTOMATION PVT.LTD."
+			)
+
+		self.assertEqual(
+			result["name"],
+			"RENU FACTORY AUTOMATION PRIVATE LIMITED",
+		)
+		self.assertEqual(get_all.call_count, 2)
+
+	def test_duplicate_identical_igst_rows_are_removed(self):
+		rows = [
+			{
+				"account_head": "Output Tax IGST - RENU",
+				"charge_type": "On Net Total",
+				"rate": 18,
+				"row_id": None,
+			},
+			{
+				"account_head": "Output Tax IGST - RENU",
+				"charge_type": "On Net Total",
+				"rate": 18,
+				"row_id": None,
+			},
+			{
+				"account_head": "Output Tax IGST - RENU",
+				"charge_type": "On Net Total",
+				"rate": 9,
+				"row_id": None,
+			},
+			{
+				"account_head": "Freight Charges - RENU",
+				"charge_type": "On Net Total",
+				"rate": 0,
+				"row_id": None,
+			},
+		]
+
+		with patch(
+			"erpnext.controllers.accounts_controller.get_taxes_and_charges",
+			return_value=rows,
+		):
+			result = get_taxes_and_charges_rows("Output GST Out-state")
+
+		self.assertEqual(len(result), 3)
+		self.assertEqual(
+			[row["rate"] for row in result],
+			[18, 9, 0],
+		)
+		self.assertEqual(
+			result[1]["account_head"],
+			"Freight Charges - RENU",
+		)
+
+	@patch(
+		"po_ai_automation.services.validation_service.find_company_for_po",
+		side_effect=lambda name, gstin: (
+			{"name": "RENU", "match_confidence": 100.0}
+			if gstin == "RENU-GSTIN"
+			else None
+		),
+	)
+	@patch(
+		"po_ai_automation.services.validation_service.find_customer_for_po",
+		side_effect=lambda name, gstin: (
+			{"name": "HBS", "match_confidence": 100.0}
+			if gstin == "HBS-GSTIN"
+			else None
+		),
+	)
+	def test_corrects_reversed_parties_using_master_matches(
+		self,
+		_find_customer,
+		_find_company,
+	):
+		po_data = {
+			"customer_name": "Renu Factory Automation Private Limited",
+			"customer_gstin": "RENU-GSTIN",
+			"supplier_name": "HBS Automation Systems",
+			"supplier_gstin": "HBS-GSTIN",
+		}
+
+		result = correct_reversed_party_roles(po_data)
+
+		self.assertEqual(
+			result["customer_name"],
+			"HBS Automation Systems",
+		)
+		self.assertEqual(result["customer_gstin"], "HBS-GSTIN")
+		self.assertEqual(
+			result["supplier_name"],
+			"Renu Factory Automation Private Limited",
+		)
+		self.assertEqual(result["supplier_gstin"], "RENU-GSTIN")
+
+	@patch(
+		"po_ai_automation.services.validation_service.find_company_by_gstin",
+		side_effect=lambda gstin: (
+			{"name": "RENU", "match_confidence": 100.0}
+			if gstin == "RENU-GSTIN"
+			else None
+		),
+	)
+	@patch(
+		"po_ai_automation.services.validation_service.find_customer_for_po",
+		side_effect=lambda name, gstin: (
+			{"name": "HBS", "match_confidence": 100.0}
+			if name == "HBS Automation Systems"
+			else None
+		),
+	)
+	def test_company_gstin_identifies_supplier_before_role_fallbacks(
+		self,
+		_find_customer,
+		_find_company,
+	):
+		po_data = {
+			"customer_name": "Renu Factory Automation Private Limited",
+			"customer_gstin": "RENU-GSTIN",
+			"supplier_name": "HBS Automation Systems",
+			"supplier_gstin": None,
+		}
+
+		result = correct_reversed_party_roles(po_data)
+
+		self.assertEqual(
+			result["customer_name"],
+			"HBS Automation Systems",
+		)
+		self.assertIsNone(result["customer_gstin"])
+		self.assertEqual(
+			result["supplier_name"],
+			"Renu Factory Automation Private Limited",
+		)
+		self.assertEqual(result["supplier_gstin"], "RENU-GSTIN")
 
 	@patch(
 		"po_ai_automation.services.sales_order_service.get_default_address",

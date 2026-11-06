@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe.contacts.doctype.address.address import get_default_address
 
@@ -308,7 +310,7 @@ def log_tax_resolution(source, template, detail=None):
 
 def get_taxes_and_charges_rows(template_name):
     """
-    Return the tax rows of a Sales Taxes and Charges Template.
+    Return template tax rows, dropping structurally duplicate GST rows.
     """
 
     if not template_name:
@@ -323,10 +325,72 @@ def get_taxes_and_charges_rows(template_name):
         template_name
     ) or []
 
+    unique_rows = []
+    seen_gst_rows = set()
+    duplicate_gst_rows = []
+
+    for row in rows:
+        signature = get_gst_tax_row_signature(row)
+        if signature is None:
+            unique_rows.append(row)
+            continue
+
+        if signature in seen_gst_rows:
+            duplicate_gst_rows.append(row)
+            continue
+
+        seen_gst_rows.add(signature)
+        unique_rows.append(row)
+
+    if duplicate_gst_rows:
+        log_tax_resolution(
+            "duplicate GST rows omitted",
+            template_name,
+            detail={
+                "duplicate_rows": [
+                    {
+                        "account_head": get_tax_row_value(row, "account_head"),
+                        "rate": get_tax_row_value(row, "rate"),
+                        "charge_type": get_tax_row_value(row, "charge_type"),
+                    }
+                    for row in duplicate_gst_rows
+                ],
+            },
+        )
+
     if not rows:
         log_tax_resolution(
             "template has no tax rows",
             template_name
         )
 
-    return rows
+    return unique_rows
+
+
+def get_gst_tax_row_signature(row):
+    account_head = str(get_tax_row_value(row, "account_head") or "")
+    gst_tax_type = str(get_tax_row_value(row, "gst_tax_type") or "").upper()
+
+    if not gst_tax_type and not re.search(
+        r"(?:^|[\s-])(IGST|CGST|SGST|UTGST)(?:$|[\s-])",
+        account_head.upper(),
+    ):
+        return None
+
+    return (
+        account_head,
+        gst_tax_type,
+        get_tax_row_value(row, "charge_type"),
+        get_tax_row_value(row, "rate"),
+        get_tax_row_value(row, "row_id"),
+        get_tax_row_value(row, "add_deduct_tax"),
+        get_tax_row_value(row, "included_in_print_rate"),
+        get_tax_row_value(row, "included_in_paid_amount"),
+    )
+
+
+def get_tax_row_value(row, fieldname):
+    if isinstance(row, dict):
+        return row.get(fieldname)
+
+    return getattr(row, fieldname, None)

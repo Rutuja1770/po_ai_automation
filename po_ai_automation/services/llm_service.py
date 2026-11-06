@@ -73,6 +73,16 @@ Do NOT assume that the first company name is the customer.
 Determine which company is acting as the BUYER in the Purchase
 Order.
 
+Use the document's title, issuer letterhead/logo, buyer and
+supplier blocks, addresses, and GSTINs together to determine
+each party's role. On a Purchase Order, the company whose
+branding/logo identifies the PO issuer is usually the
+customer/buyer; do not label a company as the customer only
+because its name or address is prominent or appears first.
+The vendor/supplier block and its GSTIN identify the supplier.
+Treat the logo as a role clue and cross-check it against the
+PO context and party details.
+
 If a GSTIN is printed for the buyer/customer, extract it as
 customer_gstin. Keep it separate from supplier_gstin.
 
@@ -98,6 +108,12 @@ Use the overall document context.
 
 IMPORTANT:
 Do not confuse the supplier with the customer.
+
+Use the PO issuer's logo/letterhead and the separate party
+blocks as cross-checks. The logo on a customer's Purchase
+Order usually identifies the buyer/customer, not the vendor.
+Keep that issuer separate from the supplier named in the
+vendor/supplier block.
 
 If a GSTIN is printed for the supplier/vendor, extract it as
 supplier_gstin. Keep it separate from customer_gstin.
@@ -258,16 +274,26 @@ For EVERY line item extract:
 - rate
 - amount
 
-item_code is the customer's own part/reference code for the
-item as written on the PO. It is NOT our internal item code.
-The code may be in a separate table column OR explicitly
-included in the item description, for example
-"Make - Renu, Model - FL001A-0800LV3". In that case extract
-the value after labels such as Model, Model No, Part No,
-Item Code, Customer Code, SKU, or Ref Code as item_code.
-Do not return the maker name or ordinary descriptive text
-as item_code. Return null only when no explicit item/reference
-code is present anywhere for that line.
+item_code is the item identifier printed on the PO for that
+line. It may be our ERPNext item code OR the customer's own
+part/reference code. Extract the exact value as printed; do
+not assume who assigned it. Read code columns (such as Item
+Code, Code, Part No, Product Code, Customer Code, Ref Code,
+SKU, Material No, or Article No) and associate each value
+with the correct table row. It may also appear after an
+explicit label in the description, for example
+"Make - Renu, Model - FL001A-0800LV3". Do not return the
+maker name or ordinary descriptive text as item_code. Preserve
+letters, digits, hyphens, slashes, and leading zeros. Return
+null only when that line has no printed item identifier.
+
+Some POs put the item identifier in a column named
+"Name of Product / Service" or similar without labeling it as
+a code. If a row's product value is a compact code-like string
+(for example "FP4070TN - E" or "FPEM-0808RP-A0401U-V2"),
+extract that value as item_code as well as description. Do not
+require an "Item Code" heading. Do not treat a full prose
+description as a code just because it contains letters/numbers.
 
 Return ALL line items.
 
@@ -304,14 +330,14 @@ GENERAL EXTRACTION RULES
 
 1. Analyze the entire Purchase Order.
 2. Use semantic meaning and document context.
-3. Do not depend on fixed field labels.
+3. Read the item-table headers and values. A compact code-like value under a product/service name column is also an item identifier even if that column is not labeled as a code.
 4. Do not assume a fixed document layout.
 5. Do not invent information.
 6. If information cannot be determined confidently, return null.
 7. Return JSON only.
 8. Do not return Markdown.
 9. Do not return explanations.
-10. Keep numeric values as numbers.
+10. Keep numeric values as numbers and item_code values as strings.
 11. Return all detected line items.
 12. Preserve item descriptions accurately.
 13. Normalize dates to YYYY-MM-DD when possible.

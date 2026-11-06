@@ -88,11 +88,24 @@ function process_po(frm, require_confirmation) {
         }).then(r => {
 
             if (r.message) {
+                const extractedData = r.message.data;
+                const missingDeliveryDate = Boolean(
+                    extractedData &&
+                    !extractedData.delivery_date
+                );
 
                 frappe.msgprint({
-                    title: "PO Processing Completed",
-                    message: "PO was processed successfully.",
-                    indicator: "green"
+                    title: missingDeliveryDate
+                        ? __("PO Processing Completed — Review Delivery Date")
+                        : __("PO Processing Completed"),
+                    message: missingDeliveryDate
+                        ? __(
+                            "No delivery date was found in the PO. " +
+                            "We set a default delivery date (today). " +
+                            "Please change it according to your requirement."
+                        )
+                        : __("PO was processed successfully."),
+                    indicator: missingDeliveryDate ? "orange" : "green"
                 });
 
                 frm.reload_doc();

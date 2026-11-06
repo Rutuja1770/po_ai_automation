@@ -8,6 +8,7 @@
  "field_order": [
   "po_item_description",
   "item_code",
+  "erpnext_item_description",
   "customer_item_code",
   "rate",
   "our_selling_price",
@@ -29,6 +30,13 @@
    "fieldtype": "Link",
    "label": "ERPNext Item",
    "options": "Item"
+  },
+  {
+   "fieldname": "erpnext_item_description",
+   "fieldtype": "Long Text",
+   "in_list_view": 1,
+   "label": "Internal Item Description",
+   "read_only": 1
   },
   {
    "fieldname": "customer_item_code",

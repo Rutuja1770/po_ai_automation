@@ -45,6 +45,19 @@ def find_item_by_code(item_code):
     return None
 
 
+def get_item_master_description(item_code):
+    """Return the ERPNext Item master description for a matched item."""
+
+    if not item_code:
+        return None
+
+    return frappe.db.get_value(
+        "Item",
+        item_code,
+        "description",
+    )
+
+
 def find_item_with_confidence(description):
     """
     Find an ERPNext Item and return the match confidence.

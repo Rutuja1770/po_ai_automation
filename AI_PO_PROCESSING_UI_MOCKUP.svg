@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#172b4d" flood-opacity=".08"/>
+    </filter>
+    <style>
+      .sans { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .title { font-size: 25px; font-weight: 700; fill: #172b4d; }
+      .sub { font-size: 13px; fill: #728096; }
+      .label { font-size: 12px; font-weight: 600; fill: #68778d; }
+      .value { font-size: 15px; font-weight: 600; fill: #25364f; }
+      .small { font-size: 12px; fill: #76849a; }
+      .body { font-size: 14px; fill: #33445d; }
+      .card { fill: #ffffff; stroke: #e7ebf1; stroke-width: 1; }
+      .line { stroke: #edf0f4; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1000" fill="#f5f7fb"/>
+
+  <!-- Sidebar -->
+  <rect width="235" height="1000" fill="#172b4d"/>
+  <rect x="24" y="24" width="38" height="38" rx="11" fill="#536dfe"/>
+  <path d="M35 44h16M43 36v16" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="74" y="40" class="sans" font-size="16" font-weight="700" fill="#fff">PO Automation</text>
+  <text x="74" y="56" class="sans" font-size="10" fill="#aebbd0">AI WORKSPACE</text>
+  <text x="24" y="111" class="sans" font-size="10" font-weight="700" letter-spacing="1.2" fill="#8798b2">WORKSPACE</text>
+  <rect x="14" y="127" width="207" height="42" rx="8" fill="#293f64"/>
+  <rect x="14" y="127" width="3" height="42" rx="2" fill="#8294ff"/>
+  <text x="42" y="153" class="sans" font-size="14" font-weight="600" fill="#fff">AI PO Processing</text>
+  <text x="24" y="207" class="sans" font-size="10" font-weight="700" letter-spacing="1.2" fill="#8798b2">SHORTCUTS</text>
+  <text x="42" y="245" class="sans" font-size="14" fill="#d2dbea">Purchase Orders</text>
+  <text x="42" y="285" class="sans" font-size="14" fill="#d2dbea">Customers</text>
+  <text x="42" y="325" class="sans" font-size="14" fill="#d2dbea">Items</text>
+  <text x="42" y="365" class="sans" font-size="14" fill="#d2dbea">Sales Orders</text>
+  <line x1="24" y1="931" x2="211" y2="931" stroke="#344968"/>
+  <circle cx="42" cy="965" r="15" fill="#405778"/>
+  <text x="42" y="970" text-anchor="middle" class="sans" font-size="11" font-weight="700" fill="#fff">AD</text>
+  <text x="67" y="962" class="sans" font-size="12" font-weight="600" fill="#fff">Administrator</text>
+  <text x="67" y="978" class="sans" font-size="10" fill="#aebbd0">System Manager</text>
+
+  <!-- Top bar -->
+  <rect x="235" width="1205" height="70" fill="#fff"/>
+  <line x1="235" y1="69" x2="1440" y2="69" class="line"/>
+  <text x="270" y="42" class="sans" font-size="13" fill="#7a8799">AI PO Processing</text>
+  <text x="390" y="42" class="sans" font-size="13" fill="#a4adba">/</text>
+  <text x="408" y="42" class="sans" font-size="13" font-weight="600" fill="#33445d">AI-PO-00042</text>
+  <rect x="1257" y="20" width="147" height="32" rx="7" fill="#fff" stroke="#dce2eb"/>
+  <circle cx="1275" cy="36" r="5" fill="#39a982"/>
+  <text x="1288" y="40" class="sans" font-size="12" font-weight="600" fill="#42536a">Saved · just now</text>
+
+  <!-- Page title and actions -->
+  <text x="270" y="119" class="sans title">AI PO Processing</text>
+  <text x="270" y="143" class="sans sub">Review extracted purchase order details and validation results.</text>
+  <rect x="1112" y="97" width="126" height="42" rx="8" fill="#fff" stroke="#d7deea"/>
+  <text x="1175" y="123" text-anchor="middle" class="sans" font-size="13" font-weight="600" fill="#34445c">View Original</text>
+  <rect x="1250" y="97" width="154" height="42" rx="8" fill="#536dfe"/>
+  <path d="M1272 118a8 8 0 1 1 2 5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M1271 113v6h6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1324" y="123" text-anchor="middle" class="sans" font-size="13" font-weight="700" fill="#fff">Process PO</text>
+
+  <!-- Status card -->
+  <rect x="270" y="166" width="1134" height="88" rx="12" class="card" filter="url(#shadow)"/>
+  <circle cx="309" cy="210" r="18" fill="#e8f7f0"/>
+  <path d="m301 210 5 5 11-12" fill="none" stroke="#21966c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="340" y="201" class="sans label">PROCESSING STATUS</text>
+  <text x="340" y="224" class="sans value">Validated</text>
+  <rect x="431" y="207" width="66" height="22" rx="11" fill="#e8f7f0"/>
+  <text x="464" y="222" text-anchor="middle" class="sans" font-size="10" font-weight="700" fill="#16845e">PASSED</text>
+  <line x1="828" y1="185" x2="828" y2="235" class="line"/>
+  <text x="864" y="201" class="sans label">AI CONFIDENCE</text>
+  <text x="864" y="226" class="sans" font-size="21" font-weight="700" fill="#25364f">94%</text>
+  <rect x="931" y="214" width="120" height="6" rx="3" fill="#e8edf5"/>
+  <rect x="931" y="214" width="113" height="6" rx="3" fill="#37a981"/>
+  <text x="1104" y="211" class="sans small">All required checks passed</text>
+
+  <!-- Main left: PO details -->
+  <rect x="270" y="276" width="700" height="257" rx="12" class="card" filter="url(#shadow)"/>
+  <text x="296" y="311" class="sans" font-size="16" font-weight="700" fill="#25364f">Purchase Order Details</text>
+  <text x="296" y="333" class="sans small">Extracted from the uploaded document</text>
+  <line x1="296" y1="350" x2="944" y2="350" class="line"/>
+  <text x="296" y="379" class="sans label">CUSTOMER</text>
+  <text x="296" y="403" class="sans value">HBS Automation Systems</text>
+  <text x="296" y="427" class="sans small">GSTIN 27BCVPS4944K1ZL · matched by GSTIN</text>
+  <text x="624" y="379" class="sans label">SUPPLIER / OUR COMPANY</text>
+  <text x="624" y="403" class="sans value">Renu Factory Automation Pvt. Ltd.</text>
+  <text x="624" y="427" class="sans small">GSTIN 27AANCR7721F1Z4 · matched by GSTIN</text>
+  <line x1="296" y1="446" x2="944" y2="446" class="line"/>
+  <text x="296" y="474" class="sans label">CUSTOMER PO NUMBER</text>
+  <text x="296" y="497" class="sans body">2627238</text>
+  <text x="503" y="474" class="sans label">PO DATE</text>
+  <text x="503" y="497" class="sans body">08 Oct 2026</text>
+  <text x="681" y="474" class="sans label">CURRENCY</text>
+  <text x="681" y="497" class="sans body">INR</text>
+  <text x="815" y="474" class="sans label">DELIVERY</text>
+  <text x="815" y="497" class="sans body">Today</text>
+
+  <!-- Main right: source file -->
+  <rect x="990" y="276" width="414" height="257" rx="12" class="card" filter="url(#shadow)"/>
+  <text x="1016" y="311" class="sans" font-size="16" font-weight="700" fill="#25364f">Source Document</text>
+  <text x="1016" y="333" class="sans small">Original PO attached to this record</text>
+  <rect x="1016" y="353" width="362" height="94" rx="9" fill="#f7f8fc" stroke="#e8ecf3"/>
+  <rect x="1034" y="373" width="42" height="52" rx="6" fill="#fff0ef"/>
+  <path d="M1046 386h18M1046 393h18M1046 400h13" stroke="#de554d" stroke-width="2" stroke-linecap="round"/>
+  <text x="1092" y="389" class="sans" font-size="13" font-weight="700" fill="#34445c">HBS_PO_2627238.pdf</text>
+  <text x="1092" y="411" class="sans small">PDF document · 2 pages · 1.8 MB</text>
+  <text x="1016" y="478" class="sans label">EXTRACTION METHOD</text>
+  <rect x="1016" y="491" width="102" height="24" rx="12" fill="#eef1ff"/>
+  <text x="1067" y="507" text-anchor="middle" class="sans" font-size="10" font-weight="700" fill="#536dfe">AI + OCR</text>
+  <text x="1130" y="507" class="sans small">Uploaded 04 Nov 2026, 9:38 AM</text>
+
+  <!-- Item table -->
+  <rect x="270" y="555" width="1134" height="367" rx="12" class="card" filter="url(#shadow)"/>
+  <text x="296" y="591" class="sans" font-size="16" font-weight="700" fill="#25364f">PO Items</text>
+  <text x="296" y="613" class="sans small">Item codes matched to ERPNext. PO descriptions are retained as provided.</text>
+  <rect x="296" y="632" width="1082" height="40" rx="6" fill="#f6f8fb"/>
+  <text x="312" y="657" class="sans label">ITEM CODE</text>
+  <text x="465" y="657" class="sans label">PO DESCRIPTION</text>
+  <text x="811" y="657" class="sans label">ERPNext ITEM DESCRIPTION</text>
+  <text x="1098" y="657" text-anchor="end" class="sans label">QTY</text>
+  <text x="1195" y="657" text-anchor="end" class="sans label">PO RATE</text>
+  <text x="1348" y="657" text-anchor="end" class="sans label">MATCH</text>
+  <line x1="296" y1="672" x2="1378" y2="672" class="line"/>
+
+  <text x="312" y="704" class="sans" font-size="13" font-weight="700" fill="#33445d">FP4070TN-E</text>
+  <text x="465" y="699" class="sans body">RENU HMI, 7" Touch Screen</text>
+  <text x="465" y="717" class="sans small">Ports: RS232, RS485, Ethernet…</text>
+  <text x="811" y="699" class="sans body">HMI Display FP 4070TN-E</text>
+  <text x="811" y="717" class="sans small">Matched Item master description</text>
+  <text x="1098" y="706" text-anchor="end" class="sans body">2</text>
+  <text x="1195" y="706" text-anchor="end" class="sans body">₹12,265.00</text>
+  <rect x="1288" y="691" width="65" height="22" rx="11" fill="#e8f7f0"/>
+  <text x="1320" y="706" text-anchor="middle" class="sans" font-size="10" font-weight="700" fill="#16845e">MATCHED</text>
+  <line x1="296" y1="737" x2="1378" y2="737" class="line"/>
+
+  <text x="312" y="770" class="sans" font-size="13" font-weight="700" fill="#33445d">FPEM-1616P-V2</text>
+  <text x="465" y="765" class="sans body">FP2/FP4 HMI Expansion</text>
+  <text x="465" y="783" class="sans small">16 DI, 16 DO, communication ports…</text>
+  <text x="811" y="765" class="sans body">HMI Expansion Module FP2/FP4</text>
+  <text x="811" y="783" class="sans small">Matched Item master description</text>
+  <text x="1098" y="772" text-anchor="end" class="sans body">2</text>
+  <text x="1195" y="772" text-anchor="end" class="sans body">₹4,235.00</text>
+  <rect x="1288" y="757" width="65" height="22" rx="11" fill="#e8f7f0"/>
+  <text x="1320" y="772" text-anchor="middle" class="sans" font-size="10" font-weight="700" fill="#16845e">MATCHED</text>
+  <line x1="296" y1="803" x2="1378" y2="803" class="line"/>
+
+  <rect x="296" y="824" width="1082" height="70" rx="8" fill="#f8fafc"/>
+  <circle cx="319" cy="849" r="8" fill="#536dfe"/>
+  <text x="337" y="853" class="sans" font-size="12" font-weight="600" fill="#3c4d64">Validation checks</text>
+  <text x="319" y="878" class="sans small">✓ Customer matched</text>
+  <text x="470" y="878" class="sans small">✓ Company GSTIN matched</text>
+  <text x="663" y="878" class="sans small">✓ Item codes matched</text>
+  <text x="827" y="878" class="sans small">✓ PO number and date present</text>
+  <text x="1348" y="853" text-anchor="end" class="sans" font-size="13" font-weight="700" fill="#33445d">Total</text>
+  <text x="1348" y="879" text-anchor="end" class="sans" font-size="17" font-weight="700" fill="#25364f">₹38,940.00</text>
+
+  <text x="270" y="958" class="sans" font-size="11" fill="#97a2b1">AI PO Automation · UI concept</text>
+</svg>

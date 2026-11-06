@@ -25,6 +25,18 @@ def find_customer_by_gstin(gstin):
     return find_master_by_gstin("Customer", gstin)
 
 
+def find_customer_for_po(customer_name, gstin):
+    """Try GSTIN first, then use the existing name match as a fallback."""
+
+    if gstin and str(gstin).strip():
+        customer = find_customer_by_gstin(gstin)
+
+        if customer:
+            return customer
+
+    return find_customer_with_confidence(customer_name)
+
+
 def find_customer_with_confidence(customer_name):
     """
     Find an ERPNext Customer and return the match confidence.

@@ -25,7 +25,7 @@ the `AI-PO-.#####` naming pattern and requires a PO attachment.
 | Customer | Link to the matched ERPNext Customer. |
 | PO Supplier (Our Company) | Supplier name extracted from the PO; expected to identify our ERPNext Company. |
 | Customer PO Number | Customer's PO number from the document. |
-| PO Date / Delivery Date | Extracted dates. If no delivery date is supplied, the document validation sets it to today. |
+| PO Date / Delivery Date | Extracted dates. If no delivery date is supplied, the document validation sets it to today; after extraction finishes, the form asks the user to review/change that default. |
 | Currency | Link to ERPNext Currency. The extracted value is assigned only if that Currency exists. |
 | PO Items | Child rows containing extracted item information and match results. |
 | AI Confidence | Overall score from 0 to 100. It is not a pass/fail threshold. |
@@ -44,6 +44,7 @@ This is the child table used by the PO Items field.
 |---|---|
 | PO Item Description | Full description extracted from the PO, stored as Long Text; display/reference only and not validated for length. Existing sites must run `bench migrate` to update the DocType and database column. |
 | ERPNext Item | Link to the matched ERPNext Item. |
+| ERPNext Item Description | Long Text copied from the matched Item master; read-only and not used for matching or validation. |
 | Customer Item Code | The customer's item/reference code extracted from the PO. |
 | Qty, UOM, Rate, Amount | Extracted line-item values. |
 | Our Selling Price | Informational price from the selling Price List configured in Selling Settings, when one unambiguous applicable price is found. |
@@ -86,6 +87,26 @@ PNG, WebP, HEIC, and HEIF attachments are sent directly to the vision extractor.
 - Both extraction paths use the Gemini API and the `gemini-3.6-flash` model.
   The API key must be configured as `gemini_api_key` in the Frappe site's
   `site_config.json`.
+- For text PDFs, if the extracted customer matches one of our Companies but
+  the extracted supplier does not, the app performs a visual role check using
+  the PO image/logo. It adopts the visual party values only when the supplier
+  resolves to a Company and the customer resolves to a different Customer.
+- When visual input is available, party roles are also checked against the
+  PO issuer's logo/letterhead: the issuer is normally the customer/buyer and
+  the vendor block identifies the supplier. The logo is cross-checked against
+  addresses and GSTINs; company-block order or prominence alone does not
+  determine the roles.
+- Before saving the extraction, if the assigned customer does not match a
+  Customer and the assigned supplier does not match a Company, the app checks
+  whether those names/GSTINs uniquely match the opposite ERPNext master types.
+  It swaps the extracted party values only when both opposite-role matches
+  are confirmed; correctly matched roles remain unchanged.
+- First, each extracted party GSTIN is checked against Company GSTINs. If the
+  GSTIN assigned to the customer is a Company GSTIN and the other party
+  resolves to a Customer, the parties are corrected so our Company is the
+  supplier. A Company GSTIN already assigned to the supplier is kept there.
+  GSTIN-based role identification runs before the existing master-role
+  correction and name checks.
 
 The expected extracted JSON includes:
 
@@ -94,14 +115,17 @@ The expected extracted JSON includes:
   `grand_total`.
 - Each item: `description`, `item_code`, `qty`, `uom`, `rate`, and `amount`.
 
-`item_code` means the customer's own item/part/reference code as printed on the
-PO; it is not assumed to be the ERPNext item code. Both extraction prompts ask
-the model to return `null` when a value cannot be determined. PO item
-descriptions are retained accurately for display, but are not used to select
-or validate ERPNext Items. If AI leaves `item_code` empty, the processing flow
-also checks the description for an explicitly labeled code (for example
-`Model- FL001A-0800LV3` or `Part No: ABC-123`) and copies only that code into
-`item_code`. Unlabeled strings are not treated as item codes.
+`item_code` means the item identifier printed on the PO for that line. It may
+be an ERPNext item code or a customer-specific part/reference code. Both
+extraction prompts direct the model to read the item-table code column and
+associate each code with its row, and to return `null` only if no identifier
+is present. if AI leaves `item_code` empty, the processing flow checks for an explicit
+code field alias, a clearly labeled identifier in the description (for
+example `Code: FP2070TN`, `Model- FL001A-0800LV3`, or `Part No: ABC-123`), or
+a compact code-shaped value that makes up the whole product/service entry
+(for example `FP4070TN - E`). It does not infer a code from ordinary prose
+descriptions. Descriptions are retained for display and are not used to match
+or validate ERPNext Items.
 
 ## 5. Validation rules
 
@@ -110,37 +134,34 @@ errors prevent Sales Order creation.
 
 ### Customer
 
-The extracted customer name is matched by
+Customer matching tries `customer_gstin` first when it is present. If it does
+not produce a unique match, the app falls back to the existing name lookup in
 `services/customer_service.py`:
 
 1. Exact `Customer.customer_name` match: 100 confidence.
 2. A single partial `LIKE` match: 80 confidence.
-3. If the name lookup has no unique match, exact GSTIN lookup checks the
-   Customer's `gstin` or `tax_id` field when present: 100 confidence.
-4. No unique name or GSTIN match: no customer match and validation fails.
+3. No unique name match: no customer match and validation fails.
 
 The returned ERPNext Customer document name is used as the resolved customer.
 This customer is also used for customer-specific item-reference matching.
-If the name lookup has no unique match, validation tries an exact GSTIN match
-against the Customer's `gstin` or `tax_id` field when present. GSTIN matching
-must identify exactly one record; ambiguous matches are rejected.
+GSTIN matching checks the Customer's `gstin` or `tax_id` field when present and
+must identify exactly one record; ambiguous or unmatched GSTINs are rejected.
 
 ### Supplier / our Company
 
 The extracted supplier is interpreted as the company receiving the customer's
-PO—our company. `services/company_service.py` checks:
+PO—our company. Matching tries `supplier_gstin` first when it is present. If
+it does not produce a unique Company match, `services/company_service.py` falls
+back to the existing name lookup:
 
 1. Exact `Company.company_name`: 100 confidence.
 2. Exact Company document name: 95 confidence.
 3. A single partial `LIKE` match: 80 confidence.
-4. If the name lookup has no unique match, exact GSTIN lookup checks the
-   Company's `gstin` or `tax_id` field when present: 100 confidence.
-5. No unique name or GSTIN match: no company match and validation fails.
+4. No unique name match: no company match and validation fails.
 
 A missing supplier also fails validation. The matched Company is used as the
-Sales Order company. If the supplier name has no unique match, validation
-tries the supplier GSTIN against the Company's `gstin` or `tax_id` field when
-present. GSTIN matching must identify exactly one Company.
+Sales Order company. GSTIN matching checks the Company's `gstin` or `tax_id`
+field and must identify exactly one record.
 
 ### Required PO information
 
@@ -160,17 +181,18 @@ is a warning, not a blocking validation error in that method.
 
 ### Item matching — exact decision order
 
-For every extracted PO line, validation uses only the customer `item_code`
-field. Before validation, that field may be populated from an explicitly
-labeled model/part/reference code found in the extracted description. The
-description itself is never sent to the item matcher:
+For every extracted PO line, validation uses only the PO `item_code` field.
+Before validation, that field may be populated from an explicit code field or
+a clearly labeled model/part/reference code found in the extracted
+description, or from a standalone compact item-code-shaped product value.
+The description itself is never sent to the item matcher:
 
 1. **Exact ERPNext item-code lookup**: match `Item.item_code` exactly. A match
    is assigned 95 confidence.
 2. **Customer reference fallback**: only if step 1 does not match, search the
    Item Customer Detail child table for the exact pair:
    - `customer_name` = resolved ERPNext Customer document name
-   - `ref_code` = extracted customer item code
+   - `ref_code` = extracted PO item code
 
    Exactly one distinct parent Item is required; that match is assigned 85
    confidence. Zero matches or multiple distinct Items are treated as no match.
@@ -245,6 +267,13 @@ inserts a Sales Order with:
 
 The app does not replace the customer's PO rate with the informational
 **Our Selling Price** value shown on the AI PO child row.
+
+The app also removes structurally identical duplicate GST rows from the
+selected Sales Taxes and Charges Template before adding its tax rows to the
+new Sales Order. This prevents a repeated identical IGST/CGST/SGST row from
+double-charging tax; the duplicate is logged. Review and correct the source
+template in ERPNext as well. Distinct rates, account heads, or tax calculation
+bases are not collapsed.
 
 Additional ERPNext setup behavior:
 

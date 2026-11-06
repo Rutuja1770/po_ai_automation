@@ -209,11 +209,21 @@ from po_ai_automation.services.extraction_utils import (
     populate_item_codes_from_descriptions
 )
 
+from po_ai_automation.services.company_service import (
+    find_company_for_po,
+)
+
+from po_ai_automation.services.customer_service import (
+    find_customer_for_po,
+)
+
 from po_ai_automation.services.validation_service import (
+    correct_reversed_party_roles,
     validate_po_data
 )
 
 from po_ai_automation.services.item_service import (
+    get_item_master_description,
     get_standard_selling_price
 )
 
@@ -293,9 +303,61 @@ def process_po(docname):
                     pdf_result["text"]
                 )
 
+                # Text extraction cannot see image-only logos. If the
+                # extracted customer matches our Company but the supplier
+                # does not, use the rendered PO to verify party roles.
+                extracted_customer_company = find_company_for_po(
+                    po_data.get("customer_name"),
+                    po_data.get("customer_gstin"),
+                )
+                extracted_supplier_company = find_company_for_po(
+                    po_data.get("supplier_name"),
+                    po_data.get("supplier_gstin"),
+                )
+
+                if extracted_customer_company and not extracted_supplier_company:
+                    try:
+                        visual_po_data = extract_po_data_from_visual_file(
+                            file_path,
+                            mime_type="application/pdf",
+                        )
+                    except Exception:
+                        frappe.log_error(
+                            frappe.get_traceback(),
+                            "AI PO Visual Party Check Error"
+                        )
+                    else:
+                        visual_company = find_company_for_po(
+                            visual_po_data.get("supplier_name"),
+                            visual_po_data.get("supplier_gstin"),
+                        )
+                        visual_customer = find_customer_for_po(
+                            visual_po_data.get("customer_name"),
+                            visual_po_data.get("customer_gstin"),
+                        )
+
+                        if (
+                            visual_company
+                            and visual_customer
+                            and visual_company["name"] != visual_customer["name"]
+                        ):
+                            po_data["customer_name"] = visual_po_data.get(
+                                "customer_name"
+                            )
+                            po_data["customer_gstin"] = visual_po_data.get(
+                                "customer_gstin"
+                            )
+                            po_data["supplier_name"] = visual_po_data.get(
+                                "supplier_name"
+                            )
+                            po_data["supplier_gstin"] = visual_po_data.get(
+                                "supplier_gstin"
+                            )
+
         po_data = populate_item_codes_from_descriptions(
             po_data
         )
+        po_data = correct_reversed_party_roles(po_data)
 
         # ==================================================
         # STEP 5: SAVE AI RESPONSE
@@ -388,6 +450,11 @@ def process_po(docname):
                         item.get("description")
                     ),
                     "item_code": item.get("erpnext_item"),
+                    "erpnext_item_description": (
+                        get_item_master_description(
+                            item.get("erpnext_item")
+                        )
+                    ),
                     "customer_item_code": item.get(
                         "item_code"
                     ),

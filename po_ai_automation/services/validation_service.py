@@ -1,15 +1,84 @@
 from po_ai_automation.services.company_service import (
     find_company_by_gstin,
-    find_matching_company
+    find_company_for_po,
 )
 from po_ai_automation.services.customer_service import (
-    find_customer_by_gstin,
-    find_customer_with_confidence
+    find_customer_for_po,
 )
 from po_ai_automation.services.item_service import (
     find_item_by_code,
     find_item_by_customer_ref
 )
+
+
+def correct_reversed_party_roles(po_data):
+    """
+    Correct customer/supplier roles only when ERPNext masters
+    confirm the extracted names are assigned to opposite roles.
+    """
+
+    customer_name = po_data.get("customer_name")
+    supplier_name = po_data.get("supplier_name")
+    customer_gstin = po_data.get("customer_gstin")
+    supplier_gstin = po_data.get("supplier_gstin")
+
+    company_from_customer_gstin = (
+        find_company_by_gstin(customer_gstin)
+        if customer_gstin
+        else None
+    )
+    company_from_supplier_gstin = (
+        find_company_by_gstin(supplier_gstin)
+        if supplier_gstin
+        else None
+    )
+
+    if company_from_supplier_gstin and not company_from_customer_gstin:
+        return po_data
+
+    if company_from_customer_gstin and not company_from_supplier_gstin:
+        customer_from_supplier_party = find_customer_for_po(
+            supplier_name,
+            supplier_gstin,
+        )
+
+        if customer_from_supplier_party:
+            po_data["customer_name"] = supplier_name
+            po_data["customer_gstin"] = supplier_gstin
+            po_data["supplier_name"] = customer_name
+            po_data["supplier_gstin"] = customer_gstin
+            return po_data
+
+    current_customer = find_customer_for_po(
+        customer_name,
+        customer_gstin,
+    )
+    current_company = find_company_for_po(
+        supplier_name,
+        supplier_gstin,
+    )
+
+    if current_customer and current_company:
+        return po_data
+
+    reversed_company = find_company_for_po(
+        customer_name,
+        customer_gstin,
+    )
+    reversed_customer = find_customer_for_po(
+        supplier_name,
+        supplier_gstin,
+    )
+
+    if not reversed_company or not reversed_customer:
+        return po_data
+
+    po_data["customer_name"] = supplier_name
+    po_data["customer_gstin"] = supplier_gstin
+    po_data["supplier_name"] = customer_name
+    po_data["supplier_gstin"] = customer_gstin
+
+    return po_data
 
 
 def validate_po_data(po_data):
@@ -22,12 +91,10 @@ def validate_po_data(po_data):
 
     customer_name = po_data.get("customer_name")
 
-    customer_match = find_customer_with_confidence(customer_name)
-
-    if not customer_match:
-        customer_match = find_customer_by_gstin(
-            po_data.get("customer_gstin")
-        )
+    customer_match = find_customer_for_po(
+        customer_name,
+        po_data.get("customer_gstin"),
+    )
 
     customer = customer_match["name"] if customer_match else None
 
@@ -46,12 +113,10 @@ def validate_po_data(po_data):
 
     supplier_name = po_data.get("supplier_name")
 
-    company_match = find_matching_company(supplier_name)
-
-    if not company_match:
-        company_match = find_company_by_gstin(
-            po_data.get("supplier_gstin")
-        )
+    company_match = find_company_for_po(
+        supplier_name,
+        po_data.get("supplier_gstin"),
+    )
 
     if not supplier_name:
         if not company_match:
