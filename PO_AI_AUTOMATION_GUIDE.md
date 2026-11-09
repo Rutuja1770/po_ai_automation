@@ -73,6 +73,11 @@ This is the child table used by the PO Items field.
 The client uses a progress/freeze message while the server call runs and
 reloads the form after success.
 
+The AI PO Processing form includes a styled overview of the current PO, its
+customer, supplier, status, confidence, attachment, and linked Sales Order.
+The existing DocType fields and item table remain available below the overview.
+The former `/app/ai-po-dashboard` URL redirects to the AI PO Processing list.
+
 ## 4. File processing and AI extraction
 
 `services/pdf_service.py` extracts selectable text from each PDF page. JPEG,

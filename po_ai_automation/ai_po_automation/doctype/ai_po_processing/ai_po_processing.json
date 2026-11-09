@@ -122,17 +122,18 @@
   {
    "fieldname": "ai_processing_section",
    "fieldtype": "Section Break",
-   "label": "AI Processing   "
+   "label": "Validation Issues"
   },
   {
    "fieldname": "erpnext_result_section",
    "fieldtype": "Section Break",
-   "label": "ERPNext Result"
+   "label": "ERPNext Record"
   },
   {
    "fieldname": "ai_response_section",
    "fieldtype": "Section Break",
-   "label": "AI Response"
+   "label": "Extraction Details",
+   "collapsible": 1
   },
   {
    "fieldname": "column_break_dika",
@@ -140,7 +141,8 @@
   },
   {
    "fieldname": "section_break_fpzn",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "PO Items"
   },
   {
    "fieldname": "po_items",

@@ -52,7 +52,7 @@ po_ai_automation/
 └── po_ai_automation/
     ├── __init__.py                    # __version__ = "0.0.1"
     ├── api.py                         # Orchestrator: process_po() endpoint
-    ├── hooks.py                       # App metadata only (no active hooks)
+    ├── hooks.py                       # App metadata and Desk styling
     ├── modules.txt                    # Module: "AI PO Automation"
     ├── patches.txt                    # Empty (no patches)
     ├── ai_po_automation/              # Module directory
@@ -73,9 +73,10 @@ po_ai_automation/
     │   ├── item_service.py            # Item master matching
     │   ├── validation_service.py      # PO data validation
     │   └── sales_order_service.py     # Sales Order creation
-    ├── config/                        # Empty (no workspace/desktop config)
+    ├── config/                        # Module configuration
     ├── patches/                       # Empty
-    ├── public/                        # Empty (no assets)
+    ├── public/
+    │       └── css/ai_po_processing.css    # AI PO Processing form styles
     └── templates/                     # Empty
 ```
 
@@ -145,6 +146,12 @@ po_ai_automation/
 - **Error handling:** exceptions logged to Error Log (`AI PO Processing Error`), doc set to Failed, then `frappe.throw`.
 - Uses `frappe.db.set_value` (bypasses controller events) and explicit `frappe.db.commit()`.
 
+### AI PO Processing form
+
+The existing DocType form presents a styled PO overview above its native
+fields and item table. Processing, validation, and Sales Order behavior continue
+to use the existing form and API workflow.
+
 ---
 
 ## 5. Services Layer
@@ -201,7 +208,7 @@ po_ai_automation/
 
 **`ai_po_processing.js`** (auto-loaded from DocType folder):
 
-- On `refresh`: adds a **"Process PO"** button for saved documents.
+- On `refresh`: adds **"Process PO"** for saved documents and renders the PO overview in the form.
 - Guards: requires `po_attachment`; asks confirmation.
 - Calls `po_ai_automation.api.process_po` with `freeze: true` ("Processing Customer PO...").
 - On success: green message + `frm.reload_doc()`.
@@ -210,7 +217,9 @@ po_ai_automation/
 
 ## 7. Hooks & Scheduled Jobs
 
-**None active.** `hooks.py` contains only app metadata; all hook sections (scheduler_events, doc_events, fixtures, jinja, dashboards, etc.) are commented-out template defaults. No background jobs, webhooks, or `frappe.enqueue` usage — the whole AI pipeline runs synchronously inside the HTTP request.
+`hooks.py` includes the AI PO Processing stylesheet in Desk. Other hook sections
+(scheduler_events, doc_events, fixtures, jinja, and background jobs) are not
+configured. The AI pipeline runs synchronously inside the HTTP request.
 
 ---
 
@@ -244,7 +253,7 @@ No other integrations (no OpenAI, email, WhatsApp, webhooks, external HTTP).
 
 ## 9. Tests & Patches
 
-- **Tests:** one empty scaffold (`test_ai_po_processing.py`, `IntegrationTestCase`) — no test cases implemented.
+- **Tests:** `test_ai_po_processing.py` contains integration tests for extraction utilities, party/item matching, and Sales Order setup.
 - **Patches:** none (`patches.txt` empty).
 
 ---
@@ -274,5 +283,4 @@ Processing
 - **Item row fields:** `uom` and `amount` are not set on created SO items.
 - **Dependencies undeclared:** `google-genai` and `PyMuPDF` should be added to `pyproject.toml`.
 - **No item matching review flow:** ambiguous matches fail validation outright instead of routing to a "Review Required" state.
-- **Dead code:** older commented-out iterations remain in `api.py`, `llm_service.py`, `vision_service.py`, `pdf_service.py`, and the JS file.
-- **No tests** and no workspace/menu entry for the module.
+- **Dead code:** older commented-out iterations remain in `api.py`, `llm_service.py`, `vision_service.py`, `pdf_service.py`, and the DocType JS file.

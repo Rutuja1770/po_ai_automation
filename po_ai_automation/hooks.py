@@ -25,7 +25,7 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/po_ai_automation/css/po_ai_automation.css"
+app_include_css = "/assets/po_ai_automation/css/ai_po_processing.css?v=12"
 # app_include_js = "/assets/po_ai_automation/js/po_ai_automation.js"
 
 # include js, css files in header of web template
@@ -255,4 +255,3 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

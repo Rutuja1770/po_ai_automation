@@ -1,0 +1,13 @@
+{
+ "doctype": "Page",
+ "name": "ai-po-dashboard",
+ "page_name": "ai-po-dashboard",
+ "title": "AI PO Processing",
+ "module": "AI PO Automation",
+ "standard": "Yes",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ]
+}
