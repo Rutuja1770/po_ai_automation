@@ -81,7 +81,7 @@ def correct_reversed_party_roles(po_data):
     return po_data
 
 
-def validate_po_data(po_data):
+def validate_po_data(po_data, customer_override=None, company_override=None):
 
     errors = []
 
@@ -91,12 +91,21 @@ def validate_po_data(po_data):
 
     customer_name = po_data.get("customer_name")
 
-    customer_match = find_customer_for_po(
-        customer_name,
-        po_data.get("customer_gstin"),
+    customer_match = (
+        {
+            "name": customer_override,
+            "match_confidence": 100.0,
+            "match_method": "manual",
+        }
+        if customer_override
+        else find_customer_for_po(
+            customer_name,
+            po_data.get("customer_gstin"),
+        )
     )
 
     customer = customer_match["name"] if customer_match else None
+    customer_unmatched = not customer_match
 
     if not customer:
         errors.append(
@@ -113,10 +122,19 @@ def validate_po_data(po_data):
 
     supplier_name = po_data.get("supplier_name")
 
-    company_match = find_company_for_po(
-        supplier_name,
-        po_data.get("supplier_gstin"),
+    company_match = (
+        {
+            "name": company_override,
+            "match_confidence": 100.0,
+            "match_method": "manual",
+        }
+        if company_override
+        else find_company_for_po(
+            supplier_name,
+            po_data.get("supplier_gstin"),
+        )
     )
+    company_unmatched = not company_match
 
     if not supplier_name:
         if not company_match:
@@ -226,12 +244,14 @@ def validate_po_data(po_data):
         "valid": len(errors) == 0,
         "errors": errors,
         "customer": customer,
+        "customer_unmatched": customer_unmatched,
         "customer_match_confidence": (
             customer_match["match_confidence"]
             if customer_match
             else 0.0
         ),
         "company": company_match["name"] if company_match else None,
+        "company_unmatched": company_unmatched,
         "company_match_confidence": (
             company_match["match_confidence"]
             if company_match

@@ -145,12 +145,14 @@ not produce a unique match, the app falls back to the existing name lookup in
 
 1. Exact `Customer.customer_name` match: 100 confidence.
 2. A single partial `LIKE` match: 80 confidence.
-3. No unique name match: no customer match and validation fails.
+3. No unique name match: no automatic customer match.
 
 The returned ERPNext Customer document name is used as the resolved customer.
 This customer is also used for customer-specific item-reference matching.
 GSTIN matching checks the Customer's `gstin` or `tax_id` field when present and
-must identify exactly one record; ambiguous or unmatched GSTINs are rejected.
+must identify exactly one record; ambiguous or unmatched GSTINs fall back to
+name matching. If no customer match is found, the form lets the user select an
+ERPNext Customer. Item matching is then rerun using that selected customer.
 
 ### Supplier / our Company
 
@@ -162,18 +164,23 @@ back to the existing name lookup:
 1. Exact `Company.company_name`: 100 confidence.
 2. Exact Company document name: 95 confidence.
 3. A single partial `LIKE` match: 80 confidence.
-4. No unique name match: no company match and validation fails.
+4. No unique name match: no automatic company match.
 
-A missing supplier also fails validation. The matched Company is used as the
-Sales Order company. GSTIN matching checks the Company's `gstin` or `tax_id`
-field and must identify exactly one record.
+If the supplier does not match a Company, the form lets the user select an
+ERPNext Company. If both customer and supplier are unmatched, both must be
+selected. Other validation issues still block Sales Order creation.
+GSTIN matching checks the Company's `gstin` or `tax_id` field and must
+identify exactly one record.
 
 ### Required PO information
 
 Validation requires:
 
-- A matched customer.
-- A supplier name that matches an ERPNext Company.
+- A matched customer or a user-selected ERPNext Customer.
+- A supplier name and either an automatic Company match or an explicit
+  user-selected Company when the supplier is unmatched.
+- A customer matched automatically or selected manually when no unique
+  ERPNext Customer match is found.
 - A PO number.
 - A PO date.
 - A currency value.
@@ -246,12 +253,18 @@ The main server flow updates statuses as follows:
 |---|---|---|
 | Processing begins | Processing | Existing value until validation completes |
 | Validation errors | Failed | Failed |
+| Customer or supplier is unmatched | Review Required or Failed (other errors present) | Warning or Failed |
+| User selects all unmatched parties and remaining validation passes | SO Created | Passed |
 | Validation succeeds and Sales Order is created | SO Created | Passed |
 | Unexpected exception | Failed (update is attempted) | Failed (update is attempted) |
 
 On validation failure, the app saves the extracted response and item rows,
 joins validation errors into **Error Message**, commits the failure state, and
-returns a `validation_failed` result. It does not create a Sales Order.
+returns a `validation_failed` result. It does not create a Sales Order. When
+the customer or supplier does not match, the form requests the corresponding
+ERPNext Customer and/or Company selection. The server validates those records,
+reruns the PO validation (including customer-specific item matching), and
+creates the Sales Order only if all checks pass.
 
 On unexpected processing exceptions, the app logs a traceback in Error Log,
 attempts to mark the record Failed, and raises a user-facing error directing

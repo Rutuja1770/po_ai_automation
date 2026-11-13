@@ -191,8 +191,8 @@ to use the existing form and API workflow.
 - `get_standard_selling_price(item_code, currency, uom)` — reads the generic, current Item Price in the enabled selling Price List configured in Selling Settings (`selling_price_list`) without changing the customer PO rate; returns no value when the setting or price is missing or ambiguous.
 
 ### 5.6 `validation_service.py`
-- `validate_po_data(po_data)` — verifies presence and validity of customer, **supplier (our company)**, PO number, date, currency, items; validates items by exact ERPNext item code, then by the resolved customer and customer reference code. Item description is retained for display and is not used to match or validate an item.
-- **Supplier = our company check:** the supplier named on a customer PO is the party the PO is addressed to, so it must match one of our ERPNext **Companies** (`services/company_service.find_matching_company`: exact `company_name` = 100, exact docname = 95, unique partial = 80). If the PO's supplier matches no Company, validation fails with *"This PO does not appear to be for our company"* — preventing POs meant for other vendors from becoming Sales Orders. A missing supplier is also an error.
+- `validate_po_data(po_data, customer_override=None, company_override=None)` — verifies customer, **supplier (our company)**, PO number, date, currency, and items; optional Customer/Company overrides are used only after the API verifies the selected ERPNext records exist. Item validation uses exact ERPNext item code, then the resolved Customer's reference code. Item description is retained for display and is not used to match or validate an item.
+- **Unmatched parties:** if extracted customer or supplier does not match a master record, the form shows a message and requests an ERPNext Customer and/or Company. The server checks the selected records and reruns the full validation, including customer-specific item matching, before creating a Sales Order. Other validation failures still block creation.
 - Before validation, `correct_reversed_party_roles` first checks both extracted GSTINs against Company GSTINs. A Company GSTIN assigned to the customer is moved to the supplier side when the other party resolves to a Customer; a Company GSTIN already assigned to the supplier is kept there. The existing opposite-master role check remains for cases not resolved by GSTIN.
 - **`ai_confidence` score (0–100):** extracted header fields (70: customer 15, supplier 10, po_number 10, po_date 10, delivery_date 5, currency 10, grand_total 10) + customer master match (15) + company match (5) + average item-code/customer-reference match (20).
 
@@ -266,12 +266,14 @@ Received (default)
    ▼
 Processing
    │
-   ├──► Failed              (validation errors or exception)
+   ├──► Review Required     (customer or supplier mismatch; awaiting selection)
    │
-   └──► SO Created          (success, Sales Order linked)
+   ├──► Failed              (other validation errors or exception)
+   │
+   └──► SO Created          (validation or selected Customer/Company succeeds)
 ```
 
-> The options `Extracted`, `Validated`, `Review Required`, `Completed` exist on the DocType but are not set by the current code.
+> The options `Extracted`, `Validated`, and `Completed` exist on the DocType but are not set by the current code.
 
 ---
 

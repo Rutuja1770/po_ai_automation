@@ -485,6 +485,60 @@ def process_po(docname):
         # STEP 7: VALIDATION FAILED
         # ==================================================
 
+        if (
+            validation_result["customer_unmatched"]
+            or validation_result["company_unmatched"]
+        ):
+            customer_error_prefix = "Customer not found:"
+            supplier_error_prefix = (
+                "This PO does not appear to be for our company. "
+                "Supplier on PO does not match any Company:"
+            )
+            other_errors = [
+                error
+                for error in validation_result["errors"]
+                if not error.startswith(customer_error_prefix)
+                and not error.startswith(supplier_error_prefix)
+                and error != "Supplier / our company could not be determined from the PO."
+            ]
+            party_errors = []
+            if validation_result["customer_unmatched"]:
+                party_errors.append(
+                    "Customer not matched: "
+                    f"{po_data.get('customer_name') or 'not identified'}. "
+                    "Select an ERPNext Customer below."
+                )
+            if validation_result["company_unmatched"]:
+                party_errors.append(
+                    "Supplier / Our Company not matched: "
+                    f"{po_data.get('supplier_name') or 'not identified'}. "
+                    "Select an ERPNext Company below."
+                )
+            error_message = "\n".join(party_errors)
+            if other_errors:
+                error_message += "\n" + "\n".join(other_errors)
+
+            frappe.db.set_value(
+                "AI PO Processing",
+                docname,
+                {
+                    "status": "Failed" if other_errors else "Review Required",
+                    "validation_status": "Failed" if other_errors else "Warning",
+                    "error_message": error_message
+                },
+                update_modified=False
+            )
+            frappe.db.commit()
+
+            return {
+                "status": "company_confirmation_required",
+                "data": po_data,
+                "message": error_message,
+                "other_errors": other_errors,
+                "customer_unmatched": validation_result["customer_unmatched"],
+                "company_unmatched": validation_result["company_unmatched"]
+            }
+
         if not validation_result["valid"]:
 
             error_message = "\n".join(
@@ -611,6 +665,111 @@ def process_po(docname):
         frappe.throw(
             f"PO processing failed: {e}"
         )
+
+
+@frappe.whitelist()
+def create_sales_order_with_company(docname, company=None, customer=None):
+    """Continue a PO after explicit selection of unmatched parties."""
+
+    doc = frappe.get_doc("AI PO Processing", docname)
+    doc.check_permission("write")
+
+    if doc.sales_order:
+        frappe.throw(
+            f"A Sales Order ({doc.sales_order}) already exists for this PO."
+        )
+
+    if not doc.raw_ai_response:
+        frappe.throw(
+            "The extracted PO data is missing. Process the PO again before continuing."
+        )
+
+    po_data = frappe.parse_json(doc.raw_ai_response)
+    if not isinstance(po_data, dict):
+        frappe.throw(
+            "The extracted PO data is invalid. Process the PO again before continuing."
+        )
+
+    validation_result = validate_po_data(po_data)
+    if not validation_result["customer_unmatched"] and not validation_result["company_unmatched"]:
+        frappe.throw(
+            "This PO no longer requires manual customer or company selection. "
+            "Refresh and process it again."
+        )
+
+    if validation_result["customer_unmatched"] and not customer:
+        errors = "\n".join(validation_result["errors"])
+        frappe.throw(errors or "Select a valid ERPNext Customer to continue.")
+    if customer and (
+        not validation_result["customer_unmatched"]
+        or not frappe.db.exists("Customer", customer)
+    ):
+        frappe.throw("Select a valid Customer for the unmatched PO customer.")
+    if validation_result["company_unmatched"] and not company:
+        errors = "\n".join(validation_result["errors"])
+        frappe.throw(errors or "Select a valid ERPNext Company to continue.")
+    if company and (
+        not validation_result["company_unmatched"]
+        or not frappe.db.exists("Company", company)
+    ):
+        frappe.throw("Select a valid Company for the unmatched PO supplier.")
+
+    validation_result = validate_po_data(
+        po_data,
+        customer_override=customer,
+        company_override=company,
+    )
+
+    if not validation_result["valid"]:
+        frappe.throw("\n".join(validation_result["errors"]))
+
+    sales_order_name = create_sales_order(po_data, validation_result)
+
+    doc.customer = validation_result["customer"]
+    doc.matched_company = validation_result["company"]
+    doc.po_items = []
+
+    for item in validation_result["items"]:
+        uom = item.get("uom")
+        if uom and not frappe.db.exists("UOM", uom):
+            uom = None
+
+        doc.append(
+            "po_items",
+            {
+                "po_item_description": item.get("description"),
+                "item_code": item.get("erpnext_item"),
+                "erpnext_item_description": get_item_master_description(
+                    item.get("erpnext_item")
+                ),
+                "customer_item_code": item.get("item_code"),
+                "qty": item.get("qty"),
+                "uom": uom,
+                "rate": item.get("rate"),
+                "our_selling_price": get_standard_selling_price(
+                    item.get("erpnext_item"),
+                    currency=doc.currency,
+                    uom=uom,
+                ),
+                "amount": item.get("amount"),
+                "match_confidence": item.get("match_confidence"),
+                "validation_status": item.get("validation_status"),
+            },
+        )
+
+    doc.status = "SO Created"
+    doc.validation_status = "Passed"
+    doc.sales_order = sales_order_name
+    doc.error_message = ""
+    doc.save(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {
+        "status": "success",
+        "data": po_data,
+        "validation": validation_result,
+        "sales_order": sales_order_name
+    }
 
 
 # import frappe

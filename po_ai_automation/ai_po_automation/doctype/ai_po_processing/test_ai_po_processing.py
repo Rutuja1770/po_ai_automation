@@ -673,3 +673,66 @@ class IntegrationTestAIPOProcessing(IntegrationTestCase):
 			result["items"][0]["validation_status"],
 			"Failed",
 		)
+
+	def test_unmatched_supplier_is_identified_for_manual_company_selection(self):
+		with patch(
+			"po_ai_automation.services.validation_service.find_company_for_po",
+			return_value=None,
+		), patch(
+			"po_ai_automation.services.validation_service.find_customer_for_po",
+			return_value={
+				"name": "Test Customer",
+				"match_confidence": 100.0,
+			},
+		), patch(
+			"po_ai_automation.services.validation_service.find_item_by_code",
+			return_value={
+				"name": "Test Item",
+				"match_confidence": 100.0,
+			},
+		):
+			result = validate_po_data(
+				self.get_po_data("TEST-ITEM")
+			)
+
+		self.assertFalse(result["valid"])
+		self.assertTrue(result["company_unmatched"])
+		self.assertEqual(
+			result["errors"],
+			[
+				"This PO does not appear to be for our company. "
+				"Supplier on PO does not match any Company: Test Company"
+			],
+		)
+
+	@patch(
+		"po_ai_automation.services.validation_service.find_company_for_po",
+		return_value={
+			"name": "Test Company",
+			"match_confidence": 100.0,
+		},
+	)
+	@patch(
+		"po_ai_automation.services.validation_service.find_item_by_code",
+		return_value={
+			"name": "Test Item",
+			"match_confidence": 95.0,
+		},
+	)
+	def test_manual_customer_selection_resolves_customer_validation(
+		self,
+		_find_item,
+		_find_company,
+	):
+		result = validate_po_data(
+			self.get_po_data("TEST-ITEM"),
+			customer_override="Selected Customer",
+		)
+
+		self.assertTrue(result["valid"])
+		self.assertFalse(result["customer_unmatched"])
+		self.assertEqual(result["customer"], "Selected Customer")
+		self.assertEqual(
+			result["items"][0]["erpnext_item"],
+			"Test Item",
+		)

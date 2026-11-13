@@ -1261,6 +1261,19 @@
         gap: 8px;
     }
 
+    .po-ai-processing-form .po-ai-workspace-po .form-section[data-fieldname="po_information_section"] > .section-body > .po-ai-po-attachment-column {
+        padding: 0 10px 10px;
+    }
+
+    .po-ai-company-mismatch {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .po-ai-company-mismatch .po-ai-select-company {
+        align-self: flex-start;
+    }
+
     .po-ai-po-party {
         padding: 5px 8px;
     }
@@ -1322,8 +1335,8 @@
 .po-ai-po-summary-card {
     flex: 0 0 100%;
     min-width: 0;
-    margin-bottom: 12px;
-    padding: 3px 4px 0;
+    margin-bottom: 2px;
+    padding: 3px 9px 0;
 }
 
 .po-ai-po-summary-header {
@@ -1331,7 +1344,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 0 4px 14px;
+    padding: 0 0 13px;
     border-bottom: 1px solid #e8edf7;
 }
 
@@ -1359,8 +1372,8 @@
 .po-ai-po-summary-title h2 {
     margin: 0;
     color: #14234f;
-    font-size: 17px;
-    font-weight: 750;
+    font-size: 16px;
+    font-weight: 700;
     letter-spacing: -.015em;
 }
 
@@ -1373,7 +1386,7 @@
 .po-ai-po-parties {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 14px 0;
+    padding: 12px 0;
     border-bottom: 1px solid #e8edf7;
 }
 
@@ -1382,7 +1395,7 @@
     align-items: flex-start;
     gap: 11px;
     min-width: 0;
-    padding: 4px 14px;
+    padding: 4px 12px;
 }
 
 .po-ai-po-party + .po-ai-po-party {
@@ -1415,8 +1428,10 @@
 
 .po-ai-po-summary-label {
     color: #64728e;
-    font-size: 11px;
-    font-weight: 550;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .25px;
 }
 
 .po-ai-po-party strong {
@@ -1453,19 +1468,58 @@
     border-radius: 12px;
 }
 
+.po-ai-company-mismatch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 14px 0 2px;
+    padding: 14px 16px;
+    background: #fff8ee;
+    border: 1px solid #f2dfc4;
+    border-radius: 10px;
+}
+
+.po-ai-company-mismatch > div {
+    min-width: 0;
+}
+
+.po-ai-company-mismatch strong {
+    color: #815113;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.po-ai-company-mismatch p {
+    margin: 4px 0 2px;
+    color: #6d5940;
+    font-size: 12px;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.po-ai-company-mismatch small {
+    color: #88745a;
+    font-size: 11px;
+}
+
+.po-ai-company-mismatch .po-ai-select-company {
+    flex: 0 0 auto;
+}
+
 .po-ai-po-meta {
     display: grid;
     grid-template-columns: 1.2fr 1.05fr .75fr 1.2fr;
-    padding: 14px 0 2px;
+    padding: 12px 0 2px;
 }
 
 .po-ai-po-meta-item {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 0;
     min-width: 0;
-    min-height: 48px;
-    padding: 4px 8px;
+    min-height: 42px;
+    padding: 3px 12px;
 }
 
 .po-ai-po-meta-item + .po-ai-po-meta-item {
@@ -1473,12 +1527,7 @@
 }
 
 .po-ai-po-meta-icon {
-    width: 26px;
-    height: 26px;
-    flex-basis: 26px;
-    color: #3e5489;
-    font-size: 14px;
-    background: transparent;
+    display: none;
 }
 
 .po-ai-po-meta-item strong {
@@ -1502,10 +1551,46 @@
 .po-ai-workspace-po .form-section[data-fieldname="po_information_section"] > .section-body > .po-ai-po-attachment-column {
     flex: 0 0 100%;
     max-width: 100%;
+    box-sizing: border-box;
+    padding: 0 24px 12px;
 }
 
 .po-ai-workspace-po .form-section[data-fieldname="po_information_section"] > .section-body > .po-ai-po-attachment-column .frappe-control:not([data-fieldname="po_attachment"]) {
     display: none;
+}
+
+.po-ai-processing-form .po-ai-workspace-po .frappe-control[data-fieldname="po_attachment"] {
+    margin: 0;
+}
+
+.po-ai-processing-form .po-ai-workspace-po .frappe-control[data-fieldname="po_attachment"] .control-label {
+    margin: 0 0 7px;
+    color: #64728e;
+    font-size: 10px;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.po-ai-processing-form .po-ai-workspace-po .frappe-control[data-fieldname="po_attachment"] .control-input-wrapper {
+    min-height: 38px;
+    padding: 0 10px;
+    background: #f6f7fa;
+    border: 1px solid #edf0f5;
+    border-radius: 8px;
+}
+
+.po-ai-processing-form .po-ai-workspace-po .frappe-control[data-fieldname="po_attachment"] .control-input {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    min-width: 0;
+}
+
+.po-ai-processing-form .po-ai-workspace-po .frappe-control[data-fieldname="po_attachment"] .control-input input {
+    min-height: 32px;
+    background: transparent;
+    border: 0;
 }
 
 .po-ai-processing-form .po-ai-workspace-po .form-column {

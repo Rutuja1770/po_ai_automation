@@ -157,6 +157,11 @@ function render_form_dashboard(frm) {
     const extractedPartyIds = get_extracted_party_ids(doc.raw_ai_response);
     const customerGstin = extractedPartyIds.customer_gstin;
     const supplierGstin = extractedPartyIds.supplier_gstin;
+    const mismatchMessage = String(doc.error_message || "");
+    const needsCustomerSelection = mismatchMessage.includes("Customer not matched:");
+    const needsCompanySelection = mismatchMessage.includes(
+        "Supplier / Our Company not matched:"
+    );
 
     const $statusControl = $poInformation.find(
         '.frappe-control[data-fieldname="status"]'
@@ -186,9 +191,8 @@ function render_form_dashboard(frm) {
     $poSummary.html(`
         <div class="po-ai-po-summary-header">
             <div class="po-ai-po-summary-title">
-                <span class="po-ai-po-summary-icon" aria-hidden="true">▤</span>
                 <div>
-                    <h2>${__("Purchase Order Details")}</h2>
+                    <h2>${__("Purchase order details")}</h2>
                     <p>${__("Extracted from uploaded document")}</p>
                 </div>
             </div>
@@ -221,7 +225,28 @@ function render_form_dashboard(frm) {
             ${po_summary_value(__("Currency"), doc.currency, "₹", escape)}
             ${po_summary_value(__("Delivery Date"), format_delivery_date(doc.delivery_date), "▱", escape)}
         </div>
+        ${needsCustomerSelection || needsCompanySelection
+            ? `<div class="po-ai-company-mismatch">
+                <div>
+                    <strong>${__("Customer / Supplier match required")}</strong>
+                    <p>${escape(mismatchMessage)}</p>
+                    <small>${__("Select each unmatched party. The PO will be validated again before a Sales Order is created.")}</small>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm po-ai-select-company">
+                    ${needsCustomerSelection && needsCompanySelection
+                        ? __("Select Customer & Company")
+                        : needsCustomerSelection
+                            ? __("Select Customer")
+                            : __("Select Company")}
+                </button>
+            </div>`
+            : ""}
     `);
+    $poSummary
+        .off("click", ".po-ai-select-company")
+        .on("click", ".po-ai-select-company", () => {
+            select_parties_for_po(frm, needsCustomerSelection, needsCompanySelection);
+        });
 
     const validationTone = ["Failed", "Warning"].includes(doc.validation_status)
         ? "warning"
@@ -502,6 +527,16 @@ function process_po(frm, require_confirmation) {
         }).then(r => {
 
             if (r.message) {
+                if (r.message.status === "company_confirmation_required") {
+                    frm.reload_doc();
+                    frappe.msgprint({
+                        title: __("Customer / Supplier Match Required"),
+                        message: frappe.utils.escape_html(r.message.message),
+                        indicator: "orange"
+                    });
+                    return r;
+                }
+
                 const extractedData = r.message.data;
                 const missingDeliveryDate = Boolean(
                     extractedData &&
@@ -538,4 +573,61 @@ function process_po(frm, require_confirmation) {
     }
 
     return start_processing();
+}
+
+function select_parties_for_po(frm, needsCustomerSelection, needsCompanySelection) {
+    const fields = [];
+    if (needsCustomerSelection) {
+        fields.push({
+            fieldname: "customer",
+            fieldtype: "Link",
+            label: __("Customer"),
+            options: "Customer",
+            reqd: 1
+        });
+    }
+    if (needsCompanySelection) {
+        fields.push({
+            fieldname: "company",
+            fieldtype: "Link",
+            label: __("Our Company"),
+            options: "Company",
+            reqd: 1
+        });
+    }
+
+    frappe.prompt(
+        fields,
+        values => {
+            frappe.call({
+                method: "po_ai_automation.api.create_sales_order_with_company",
+                args: {
+                    docname: frm.doc.name,
+                    customer: values.customer || "",
+                    company: values.company || ""
+                },
+                freeze: true,
+                freeze_message: __("Creating Sales Order...")
+            }).then(r => {
+                if (r.message && r.message.status === "success") {
+                    frappe.msgprint({
+                        title: __("Sales Order Created"),
+                        message: __("Sales Order {0} was created.", [
+                            frappe.utils.escape_html(r.message.sales_order)
+                        ]),
+                        indicator: "green"
+                    });
+                    frm.reload_doc();
+                }
+            }).catch(error => {
+                frappe.msgprint({
+                    title: __("Unable to Create Sales Order"),
+                    message: error.message || __("Check the selected company and PO details, then try again."),
+                    indicator: "red"
+                });
+            });
+        },
+        __("Select Our Company"),
+        __("Create Sales Order")
+    );
 }
